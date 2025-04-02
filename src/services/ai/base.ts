@@ -1,4 +1,4 @@
-import { AIMessage, AIService, AICompletionRequest, AICompletionResponse, AIStreamChunk, AIServiceConfig } from './types';
+import { AIMessage, AIService, AICompletionRequest, AICompletionResponse, AIStreamChunk, AIServiceConfig, AIModelOption } from './types';
 
 /**
  * Abstract base class for AI services that implements common functionality
@@ -12,6 +12,32 @@ export abstract class BaseAIService implements AIService {
   
   abstract id: string;
   abstract name: string;
+  
+  /**
+   * Get the available models for this service
+   */
+  abstract getAvailableModels(): AIModelOption[];
+  
+  /**
+   * Get the currently selected model
+   */
+  getSelectedModel(): string {
+    return this.config.model;
+  }
+  
+  /**
+   * Set the active model
+   */
+  setModel(modelId: string): void {
+    const availableModels = this.getAvailableModels();
+    const isValidModel = availableModels.some(model => model.id === modelId);
+    
+    if (isValidModel) {
+      this.config.model = modelId;
+    } else {
+      throw new Error(`Invalid model ID: ${modelId}. Available models are: ${availableModels.map(m => m.id).join(', ')}`);
+    }
+  }
   
   /**
    * Process messages to format them for the specific AI service
