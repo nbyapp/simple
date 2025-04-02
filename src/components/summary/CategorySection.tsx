@@ -20,21 +20,32 @@ const CategorySection: React.FC<CategorySectionProps> = ({
   return (
     <Container>
       <Header onClick={onToggle}>
-        {icon && <IconWrapper>{icon}</IconWrapper>}
-        <Title>{title}</Title>
-        <ExpandIcon expanded={expanded} />
+        <HeaderLeft>
+          {icon && <IconWrapper>{icon}</IconWrapper>}
+          <Title>{title}</Title>
+        </HeaderLeft>
+        <ExpandIcon expanded={expanded}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path
+              d="M6 9L12 15L18 9"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </ExpandIcon>
       </Header>
-      
       <AnimatePresence>
         {expanded && (
-          <Content
+          <ContentWrapper
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.3 }}
           >
-            {children}
-          </Content>
+            <Content>{children}</Content>
+          </ContentWrapper>
         )}
       </AnimatePresence>
     </Container>
@@ -42,15 +53,12 @@ const CategorySection: React.FC<CategorySectionProps> = ({
 }
 
 const Container = styled.div`
-  margin-bottom: ${({ theme }) => theme.spacing.md};
-  border-radius: ${({ theme }) => theme.borderRadius.md};
-  background-color: ${({ theme }) => theme.colors.background};
-  box-shadow: ${({ theme }) => theme.shadows.sm};
-  overflow: hidden;
+  border-bottom: 1px solid ${({ theme }) => `${theme.colors.text.tertiary}33`};
 `
 
 const Header = styled.div`
   display: flex;
+  justify-content: space-between;
   align-items: center;
   padding: ${({ theme }) => theme.spacing.md};
   cursor: pointer;
@@ -62,19 +70,22 @@ const Header = styled.div`
   }
 `
 
+const HeaderLeft = styled.div`
+  display: flex;
+  align-items: center;
+`
+
 const IconWrapper = styled.div`
-  margin-right: ${({ theme }) => theme.spacing.sm};
   display: flex;
   align-items: center;
   justify-content: center;
-  color: ${({ theme }) => theme.colors.primary};
+  margin-right: ${({ theme }) => theme.spacing.sm};
+  color: ${({ theme }) => theme.colors.text.secondary};
 `
 
-const Title = styled.h2`
-  flex: 1;
+const Title = styled.h3`
   font-size: ${({ theme }) => theme.typography.body.regular.fontSize};
   font-weight: 600;
-  margin: 0;
   color: ${({ theme }) => theme.colors.text.primary};
 `
 
@@ -83,37 +94,20 @@ interface ExpandIconProps {
 }
 
 const ExpandIcon = styled.div<ExpandIconProps>`
-  width: 20px;
-  height: 20px;
-  position: relative;
-  
-  &::before,
-  &::after {
-    content: '';
-    position: absolute;
-    background-color: ${({ theme }) => theme.colors.text.secondary};
-    transition: transform ${({ theme }) => theme.transitions.quick};
-  }
-  
-  &::before {
-    top: 9px;
-    left: 2px;
-    width: 16px;
-    height: 2px;
-  }
-  
-  &::after {
-    top: 2px;
-    left: 9px;
-    width: 2px;
-    height: 16px;
-    transform: ${({ expanded }) => expanded ? 'scaleY(0)' : 'scaleY(1)'};
-  }
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: ${({ theme }) => theme.colors.text.tertiary};
+  transition: transform ${({ theme }) => theme.transitions.quick};
+  transform: ${({ expanded }) => expanded ? 'rotate(180deg)' : 'rotate(0)'};
 `
 
-const Content = styled(motion.div)`
-  padding: 0 ${({ theme }) => theme.spacing.md} ${({ theme }) => theme.spacing.md};
+const ContentWrapper = styled(motion.div)`
   overflow: hidden;
+`
+
+const Content = styled.div`
+  padding: 0 ${({ theme }) => theme.spacing.md} ${({ theme }) => theme.spacing.md};
 `
 
 export default CategorySection
