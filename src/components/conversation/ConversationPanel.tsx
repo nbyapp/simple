@@ -4,30 +4,32 @@ import MessageList, { Message } from './MessageList'
 import InputArea from './InputArea'
 
 interface ConversationPanelProps {
-  initialMessages?: Message[]
+  messages: Message[]
   onSendMessage: (message: string) => void
   isProcessing?: boolean
+  suggestions?: string[]
   highlightedMessageIds?: string[]
 }
 
 const ConversationPanel: React.FC<ConversationPanelProps> = ({
-  initialMessages = [],
+  messages,
   onSendMessage,
   isProcessing = false,
+  suggestions = [],
   highlightedMessageIds = [],
 }) => {
-  const [messages] = useState<Message[]>(initialMessages)
-  const [suggestions] = useState<string[]>([
-    'I want to build a fitness app',
-    'Create a photo sharing app',
-    'I need a task management app',
-  ])
+  const [isTyping, setIsTyping] = useState(false)
+
+  // In a real implementation, this would come from the AI response status
+  React.useEffect(() => {
+    setIsTyping(isProcessing)
+  }, [isProcessing])
 
   return (
     <Container>
       <MessageList 
         messages={messages} 
-        isTyping={isProcessing}
+        isTyping={isTyping}
         highlightedMessageIds={highlightedMessageIds}
       />
       <InputArea 
@@ -43,9 +45,10 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({
 const Container = styled.div`
   display: flex;
   flex-direction: column;
-  flex: 1;
-  overflow: hidden;
+  flex: 3;
+  height: 100%;
   border-right: 1px solid ${({ theme }) => `${theme.colors.text.tertiary}33`};
+  background-color: ${({ theme }) => theme.colors.background};
 `
 
 export default ConversationPanel
