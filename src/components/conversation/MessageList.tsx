@@ -22,49 +22,69 @@ const MessageList: React.FC<MessageListProps> = ({
   highlightedMessageIds = [],
 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  
-  // Scroll to bottom when messages change or typing state changes
+
+  // Scroll to bottom when messages change or when typing starts/stops
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' })
+    }
   }, [messages, isTyping])
 
-  // Group messages by sender for consecutive messages
-  const groupedMessages = messages.reduce<{sender: MessageSender, messages: Message[]}[]>((groups, message) => {
-    const lastGroup = groups[groups.length - 1]
+  // Group messages by sender to create visual clusters
+  const getMessageGroups = () => {
+    const groups: Message[][] = []
+    let currentGroup: Message[] = []
     
-    if (lastGroup && lastGroup.sender === message.sender) {
-      lastGroup.messages.push(message)
-    } else {
-      groups.push({ sender: message.sender, messages: [message] })
+    messages.forEach((message, index) => {
+      // Start a new group if sender changes
+      if (index === 0 || message.sender !== messages[index - 1].sender) {
+        if (currentGroup.length > 0) {
+          groups.push([...currentGroup])
+        }
+        currentGroup = [message]
+      } else {
+        // Add to current group if sender is the same
+        currentGroup.push(message)
+      }
+    })
+    
+    // Add the last group
+    if (currentGroup.length > 0) {
+      groups.push(currentGroup)
     }
     
     return groups
-  }, [])
+  }
+
+  const messageGroups = getMessageGroups()
 
   return (
     <Container>
-      {groupedMessages.map((group, groupIndex) => (
-        <MessageGroup key={groupIndex}>
-          {group.messages.map((message, messageIndex) => (
-            <MessageBubbleWrapper 
+      {messageGroups.map((group, groupIndex) => (
+        <MessageGroup 
+          key={`group-${groupIndex}`}
+          sender={group[0].sender}
+        >
+          {group.map((message, messageIndex) => (
+            <MessageWrapper 
               key={message.id}
               isHighlighted={highlightedMessageIds.includes(message.id)}
-              isFirstInGroup={messageIndex === 0}
-              isLastInGroup={messageIndex === group.messages.length - 1}
             >
               <MessageBubble
                 sender={message.sender}
                 content={message.content}
                 timestamp={message.timestamp}
                 status={message.status}
+                isTyping={isTyping && messageIndex === group.length - 1 && groupIndex === messageGroups.length - 1}
               />
-            </MessageBubbleWrapper>
+            </MessageWrapper>
           ))}
         </MessageGroup>
       ))}
-      
-      {isTyping && (
-        <MessageGroup>
+
+      {/* Add a typing indicator for the AI if needed */}
+      {isTyping && messages.length > 0 && messages[messages.length - 1].sender !== 'ai' && (
+        <MessageGroup sender="ai">
           <MessageBubble
             sender="ai"
             content=""
@@ -86,53 +106,57 @@ const Container = styled.div`
   flex: 1;
 `
 
-const MessageGroup = styled.div`
-  display: flex;
-  flex-direction: column;
-  margin-bottom: ${({ theme }) => theme.spacing.md};
-`
-
-interface MessageBubbleWrapperProps {
-  isHighlighted: boolean
-  isFirstInGroup: boolean
-  isLastInGroup: boolean
+interface MessageGroupProps {
+  sender: MessageSender
 }
 
-const MessageBubbleWrapper = styled.div<MessageBubbleWrapperProps>`
+const MessageGroup = styled.div<MessageGroupProps>`
+  display: flex;
+  flex-direction: column;
+  align-items: ${({ sender }) => 
+    sender === 'user' 
+      ? 'flex-end' 
+      : sender === 'system' 
+        ? 'center' 
+        : 'flex-start'
+  };
+  margin-bottom: ${({ theme }) => theme.spacing.lg};
+`
+
+interface MessageWrapperProps {
+  isHighlighted: boolean
+}
+
+const MessageWrapper = styled.div<MessageWrapperProps>`
   position: relative;
+  max-width: 100%;
   
   ${({ isHighlighted, theme }) => isHighlighted && `
     &::before {
       content: '';
       position: absolute;
-      top: -${theme.spacing.xs};
-      left: -${theme.spacing.xs};
-      right: -${theme.spacing.xs};
-      bottom: -${theme.spacing.xs};
-      background-color: ${theme.colors.primary}22;
+      top: -4px;
+      left: -4px;
+      right: -4px;
+      bottom: -4px;
       border-radius: ${theme.borderRadius.md};
+      background-color: ${theme.colors.primary}22;
       z-index: -1;
+      animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+      0% {
+        box-shadow: 0 0 0 0 ${theme.colors.primary}44;
+      }
+      70% {
+        box-shadow: 0 0 0 6px ${theme.colors.primary}00;
+      }
+      100% {
+        box-shadow: 0 0 0 0 ${theme.colors.primary}00;
+      }
     }
   `}
-  
-  /* Adjust spacing between messages in same group */
-  ${({ isFirstInGroup, isLastInGroup, theme }) => {
-    if (!isFirstInGroup && !isLastInGroup) {
-      return `
-        margin-top: ${theme.spacing.xs};
-        margin-bottom: ${theme.spacing.xs};
-      `
-    } else if (!isFirstInGroup) {
-      return `
-        margin-top: ${theme.spacing.xs};
-      `
-    } else if (!isLastInGroup) {
-      return `
-        margin-bottom: ${theme.spacing.xs};
-      `
-    }
-    return '';
-  }}
 `
 
 export default MessageList
