@@ -1,5 +1,5 @@
 import { BaseAIService } from './base';
-import { AIMessage, AICompletionResponse, AIStreamChunk, AIServiceConfig, AIServiceFactory } from './types';
+import { AIMessage, AICompletionResponse, AIStreamChunk, AIServiceConfig, AIServiceFactory, AIModelOption, ANTHROPIC_MODELS } from './types';
 import Anthropic from '@anthropic-ai/sdk';
 import { createProxyFetch } from './proxy';
 
@@ -18,15 +18,23 @@ export class AnthropicService extends BaseAIService {
     // Create a fetch function that uses our proxy to avoid CORS issues
     const proxyFetch = createProxyFetch(
       config.baseUrl || 'https://api.anthropic.com',
-      config.apiKey
+      config.apiKey,
+      config.useMock || false
     );
     
     // Initialize the Anthropic client with our custom fetch
     this.client = new Anthropic({
-      apiKey: config.apiKey,
+      apiKey: config.apiKey || 'mock-key',
       baseURL: config.baseUrl || undefined,
       fetch: proxyFetch as any, // Type assertion needed for compatibility
     });
+  }
+  
+  /**
+   * Get available models for this service
+   */
+  getAvailableModels(): AIModelOption[] {
+    return ANTHROPIC_MODELS;
   }
   
   protected formatMessages(messages: AIMessage[], systemPrompt?: string): {
@@ -120,6 +128,11 @@ export class AnthropicService extends BaseAIService {
  */
 export class AnthropicServiceFactory implements AIServiceFactory {
   create(config: AIServiceConfig): AnthropicService {
+    // Set default model if not specified
+    if (!config.model) {
+      config.model = ANTHROPIC_MODELS[0].id;
+    }
+    
     return new AnthropicService(config);
   }
 }
