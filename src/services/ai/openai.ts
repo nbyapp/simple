@@ -1,6 +1,7 @@
 import { BaseAIService } from './base';
 import { AIMessage, AICompletionResponse, AIStreamChunk, AIServiceConfig, AIServiceFactory } from './types';
 import OpenAI from 'openai';
+import { createProxyFetch } from './proxy';
 
 /**
  * OpenAI service adapter
@@ -14,9 +15,17 @@ export class OpenAIService extends BaseAIService {
   constructor(config: AIServiceConfig) {
     super(config);
     
+    // Create a fetch function that uses our proxy to avoid CORS issues
+    const proxyFetch = createProxyFetch(
+      config.baseUrl || 'https://api.openai.com',
+      config.apiKey
+    );
+    
+    // Initialize the OpenAI client with our custom fetch
     this.client = new OpenAI({
       apiKey: config.apiKey,
       baseURL: config.baseUrl || undefined,
+      fetch: proxyFetch as any, // Type assertion needed for compatibility
     });
   }
   
@@ -43,13 +52,18 @@ export class OpenAIService extends BaseAIService {
   }
   
   protected async makeCompletionRequest(formattedMessages: OpenAI.Chat.ChatCompletionMessageParam[], stream: boolean): Promise<any> {
-    return this.client.chat.completions.create({
-      model: this.config.model,
-      messages: formattedMessages,
-      temperature: this.config.temperature || 0.7,
-      max_tokens: this.config.maxTokens,
-      stream: stream,
-    });
+    try {
+      return this.client.chat.completions.create({
+        model: this.config.model,
+        messages: formattedMessages,
+        temperature: this.config.temperature || 0.7,
+        max_tokens: this.config.maxTokens,
+        stream: stream,
+      });
+    } catch (error) {
+      console.error("Error in OpenAI API call:", error);
+      throw error;
+    }
   }
   
   protected parseCompletionResponse(response: OpenAI.Chat.ChatCompletion): AICompletionResponse {
