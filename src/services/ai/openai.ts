@@ -1,5 +1,5 @@
 import { BaseAIService } from './base';
-import { AIMessage, AICompletionResponse, AIStreamChunk, AIServiceConfig, AIServiceFactory } from './types';
+import { AIMessage, AICompletionResponse, AIStreamChunk, AIServiceConfig, AIServiceFactory, AIModelOption, OPENAI_MODELS } from './types';
 import OpenAI from 'openai';
 import { createProxyFetch } from './proxy';
 
@@ -18,15 +18,23 @@ export class OpenAIService extends BaseAIService {
     // Create a fetch function that uses our proxy to avoid CORS issues
     const proxyFetch = createProxyFetch(
       config.baseUrl || 'https://api.openai.com',
-      config.apiKey
+      config.apiKey,
+      config.useMock || false
     );
     
     // Initialize the OpenAI client with our custom fetch
     this.client = new OpenAI({
-      apiKey: config.apiKey,
+      apiKey: config.apiKey || 'mock-key',
       baseURL: config.baseUrl || undefined,
       fetch: proxyFetch as any, // Type assertion needed for compatibility
     });
+  }
+  
+  /**
+   * Get available models for this service
+   */
+  getAvailableModels(): AIModelOption[] {
+    return OPENAI_MODELS;
   }
   
   protected formatMessages(messages: AIMessage[], systemPrompt?: string): OpenAI.Chat.ChatCompletionMessageParam[] {
@@ -94,6 +102,11 @@ export class OpenAIService extends BaseAIService {
  */
 export class OpenAIServiceFactory implements AIServiceFactory {
   create(config: AIServiceConfig): OpenAIService {
+    // Set default model if not specified
+    if (!config.model) {
+      config.model = OPENAI_MODELS[0].id;
+    }
+    
     return new OpenAIService(config);
   }
 }
