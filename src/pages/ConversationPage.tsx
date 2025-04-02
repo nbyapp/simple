@@ -102,8 +102,8 @@ const MessageItem = styled.div<MessageItemProps>`
     } else {
       return `
         background-color: ${theme.colors.message.system};
-        color: ${theme.colors.text.primary};
-        border-left: 3px solid ${theme.colors.primary};
+        color: ${theme.colors.text.secondary};
+        font-style: italic;
       `
     }
   }}
@@ -120,11 +120,10 @@ const MessageInput = styled.input`
   padding: ${({ theme }) => theme.spacing.md};
   border: 1px solid ${({ theme }) => `${theme.colors.text.tertiary}66`};
   border-radius: ${({ theme }) => theme.borderRadius.md};
-  font-family: ${({ theme }) => theme.typography.fontFamily};
   font-size: ${({ theme }) => theme.typography.body.regular.fontSize};
+  outline: none;
   
   &:focus {
-    outline: none;
     border-color: ${({ theme }) => theme.colors.primary};
   }
 `
@@ -132,10 +131,10 @@ const MessageInput = styled.input`
 const SendButton = styled.button`
   background-color: ${({ theme }) => theme.colors.primary};
   color: white;
-  margin-left: ${({ theme }) => theme.spacing.md};
-  padding: ${({ theme }) => theme.spacing.md} ${({ theme }) => theme.spacing.lg};
-  border-radius: ${({ theme }) => theme.borderRadius.md};
   font-weight: 600;
+  padding: ${({ theme }) => theme.spacing.md} ${({ theme }) => theme.spacing.lg};
+  margin-left: ${({ theme }) => theme.spacing.md};
+  border-radius: ${({ theme }) => theme.borderRadius.md};
   transition: background-color ${({ theme }) => theme.transitions.quick};
   
   &:hover {
@@ -159,16 +158,14 @@ const SummaryHeader = styled.h2`
 
 const EmptyState = styled.div`
   display: flex;
-  align-items: center;
   justify-content: center;
+  align-items: center;
   height: 200px;
-  background-color: ${({ theme }) => theme.colors.background};
-  border: 1px dashed ${({ theme }) => `${theme.colors.text.tertiary}66`};
-  border-radius: ${({ theme }) => theme.borderRadius.md};
-  color: ${({ theme }) => theme.colors.text.secondary};
-  padding: ${({ theme }) => theme.spacing.lg};
+  color: ${({ theme }) => theme.colors.text.tertiary};
   text-align: center;
-  font-size: ${({ theme }) => theme.typography.body.small.fontSize};
+  border: 1px dashed ${({ theme }) => `${theme.colors.text.tertiary}66`};
+  border-radius: ${({ theme }) => theme.borderRadius.lg};
+  padding: ${({ theme }) => theme.spacing.lg};
 `
 
 export default ConversationPage
