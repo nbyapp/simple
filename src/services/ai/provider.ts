@@ -1,4 +1,4 @@
-import { AIService, AIServiceFactory, AIServiceConfig } from './types';
+import { AIService, AIServiceFactory, AIServiceConfig, AIModelOption } from './types';
 import { OpenAIServiceFactory } from './openai';
 import { AnthropicServiceFactory } from './anthropic';
 
@@ -34,6 +34,12 @@ export class AIServiceProvider {
     
     if (!factory) {
       throw new Error(`No factory registered for service ID: ${id}`);
+    }
+    
+    // Enable mock mode if no API key is provided
+    if (!config.apiKey) {
+      console.log(`No API key provided for ${id}, using mock mode`);
+      config.useMock = true;
     }
     
     const service = factory.create(config);
@@ -87,6 +93,30 @@ export class AIServiceProvider {
    */
   getAllServices(): AIService[] {
     return Array.from(this.services.values());
+  }
+  
+  /**
+   * Get available models for a specific service
+   */
+  getModels(serviceId: string): AIModelOption[] {
+    const service = this.getService(serviceId);
+    return service.getAvailableModels();
+  }
+  
+  /**
+   * Get the current model for a specific service
+   */
+  getSelectedModel(serviceId: string): string {
+    const service = this.getService(serviceId);
+    return service.getSelectedModel();
+  }
+  
+  /**
+   * Set the model for a specific service
+   */
+  setModel(serviceId: string, modelId: string): void {
+    const service = this.getService(serviceId);
+    service.setModel(modelId);
   }
   
   /**
