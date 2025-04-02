@@ -12,7 +12,9 @@
     "build-storybook": "storybook build"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.16.0",
     "framer-motion": "^11.0.8",
+    "openai": "^4.28.4",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.22.2",
