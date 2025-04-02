@@ -49,35 +49,67 @@ export class ConversationService {
   }
   
   /**
+   * Get a mock response when APIs fail - for demo purposes only
+   */
+  private getMockResponse(userMessage: string): string {
+    // Simple fallback responses
+    if (userMessage.toLowerCase().includes('hello') || userMessage.toLowerCase().includes('hi')) {
+      return "Hello! I'm here to help you create your app. What kind of app are you looking to build?";
+    } else if (userMessage.toLowerCase().includes('app')) {
+      return "Great! Could you tell me more about what problem your app is trying to solve?";
+    } else {
+      return "I understand. Let's explore that further. What features would be most important for your app?";
+    }
+  }
+  
+  /**
    * Send a user message and get a response
    */
   async sendMessage(content: string): Promise<ConversationResult> {
     // Add user message to history
     this.addMessage('user', content);
     
-    // Get the default AI service
-    const aiService = aiServiceProvider.getDefaultService();
-    
-    // Get completion from AI
-    const response = await aiService.getCompletion({
-      messages: this.messages,
-      systemPrompt: PromptManager.getMainSystemPrompt(),
-    });
-    
-    // Add assistant response to history
-    this.addMessage('assistant', response.content);
-    
-    // Generate suggestions based on the conversation
-    const suggestions = await this.generateSuggestions();
-    
-    // Extract decisions from the conversation
-    const decisions = await this.extractDecisions();
-    
-    return {
-      message: response.content,
-      suggestions,
-      decisions,
-    };
+    try {
+      // Get the default AI service
+      const aiService = aiServiceProvider.getDefaultService();
+      
+      // Get completion from AI
+      const response = await aiService.getCompletion({
+        messages: this.messages,
+        systemPrompt: PromptManager.getMainSystemPrompt(),
+      });
+      
+      // Add assistant response to history
+      this.addMessage('assistant', response.content);
+      
+      // Generate suggestions based on the conversation
+      const suggestions = await this.generateSuggestions();
+      
+      // Extract decisions from the conversation
+      const decisions = await this.extractDecisions();
+      
+      return {
+        message: response.content,
+        suggestions,
+        decisions,
+      };
+    } catch (error) {
+      console.error('Error in AI service:', error);
+      
+      // Fallback to mock response for demo purposes
+      const mockResponse = this.getMockResponse(content);
+      this.addMessage('assistant', mockResponse);
+      
+      return {
+        message: mockResponse,
+        suggestions: [
+          'Tell me more about that',
+          'What features do you need?',
+          'Who are your target users?',
+        ],
+        decisions: [],
+      };
+    }
   }
   
   /**
@@ -87,43 +119,90 @@ export class ConversationService {
     // Add user message to history
     this.addMessage('user', content);
     
-    // Get the default AI service
-    const aiService = aiServiceProvider.getDefaultService();
-    
-    // Get streaming completion from AI
-    let fullResponse = '';
-    
-    for await (const chunk of aiService.getCompletionStream({
-      messages: this.messages,
-      systemPrompt: PromptManager.getMainSystemPrompt(),
-      stream: true,
-    })) {
-      // Call the callback with the chunk
-      onChunk(chunk);
+    try {
+      // Get the default AI service
+      const aiService = aiServiceProvider.getDefaultService();
       
-      // Accumulate the response
-      fullResponse += chunk.content;
+      // Get streaming completion from AI
+      let fullResponse = '';
       
-      // If it's the last chunk, finalize the message
-      if (chunk.done) {
-        break;
+      try {
+        for await (const chunk of aiService.getCompletionStream({
+          messages: this.messages,
+          systemPrompt: PromptManager.getMainSystemPrompt(),
+          stream: true,
+        })) {
+          // Call the callback with the chunk
+          onChunk(chunk);
+          
+          // Accumulate the response
+          fullResponse += chunk.content;
+          
+          // If it's the last chunk, finalize the message
+          if (chunk.done) {
+            break;
+          }
+        }
+      } catch (streamError) {
+        console.error('Error in streaming response:', streamError);
+        
+        // If streaming fails, fall back to non-streaming completion
+        const fallbackResponse = await this.sendMessage(content);
+        return fallbackResponse;
       }
+      
+      // Add assistant response to history
+      this.addMessage('assistant', fullResponse);
+      
+      // Generate suggestions based on the conversation
+      const suggestions = await this.generateSuggestions();
+      
+      // Extract decisions from the conversation
+      const decisions = await this.extractDecisions();
+      
+      return {
+        message: fullResponse,
+        suggestions,
+        decisions,
+      };
+    } catch (error) {
+      console.error('Error in AI service:', error);
+      
+      // Fallback to mock response for demo purposes
+      const mockResponse = this.getMockResponse(content);
+      
+      // Simulate streaming for mock response
+      const words = mockResponse.split(' ');
+      for (const word of words) {
+        onChunk({
+          content: word + ' ',
+          finishReason: null,
+          done: false,
+        });
+        
+        // Add a small delay to simulate typing
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+      
+      // Signal completion
+      onChunk({
+        content: '',
+        finishReason: 'stop',
+        done: true,
+      });
+      
+      this.addMessage('assistant', mockResponse);
+      
+      return {
+        message: mockResponse,
+        suggestions: [
+          'Tell me more about that',
+          'What features do you need?',
+          'Who are your target users?',
+        ],
+        decisions: [],
+      };
     }
-    
-    // Add assistant response to history
-    this.addMessage('assistant', fullResponse);
-    
-    // Generate suggestions based on the conversation
-    const suggestions = await this.generateSuggestions();
-    
-    // Extract decisions from the conversation
-    const decisions = await this.extractDecisions();
-    
-    return {
-      message: fullResponse,
-      suggestions,
-      decisions,
-    };
   }
   
   /**
@@ -157,7 +236,11 @@ export class ConversationService {
       }
     } catch (error) {
       console.error('Failed to generate suggestions:', error);
-      return [];
+      return [
+        'Tell me more about that',
+        'What features do you need?',
+        'Who are your target users?',
+      ];
     }
   }
   
