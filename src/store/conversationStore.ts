@@ -2,6 +2,8 @@ import { create } from 'zustand'
 import { v4 as uuidv4 } from 'uuid'
 import { Message } from '../components/conversation/MessageList'
 import { Decision, Category } from '../components/summary/SummaryPanel'
+import { conversationService, aiServiceProvider } from '../services/ai'
+import { AI_SERVICE_CONFIGS, DEFAULT_AI_SERVICE } from '../config/ai'
 
 interface ConversationState {
   // Conversation data
@@ -15,12 +17,17 @@ interface ConversationState {
   categories: Category[]
   expandedCategories: string[]
   
+  // AI service configuration
+  aiServiceId: string
+  
   // Actions
-  sendMessage: (content: string) => void
+  sendMessage: (content: string) => Promise<void>
   highlightMessages: (messageIds: string[]) => void
   toggleCategory: (categoryId: string) => void
   addDecision: (decision: Omit<Decision, 'id'>) => void
   updateDecision: (id: string, updates: Partial<Omit<Decision, 'id'>>) => void
+  setAIService: (serviceId: string) => void
+  initializeAIServices: () => void
 }
 
 // Initial categories
@@ -30,22 +37,6 @@ const initialCategories: Category[] = [
   { id: 'features', title: 'Key Features' },
   { id: 'technology', title: 'Technical Requirements' },
 ]
-
-// For demonstration purposes only - in a real app, this would come from the AI service
-const mockAIResponse = (userMessage: string): Promise<string> => {
-  return new Promise((resolve) => {
-    // Simulate network delay
-    setTimeout(() => {
-      if (userMessage.toLowerCase().includes('hello') || userMessage.toLowerCase().includes('hi')) {
-        resolve('Hello! I\'m here to help you create your app. What kind of app are you looking to build?')
-      } else if (userMessage.toLowerCase().includes('app')) {
-        resolve('Great! Could you tell me more about what problem your app is trying to solve?')
-      } else {
-        resolve('I understand. Let\'s explore that further. What features would be most important for your app?')
-      }
-    }, 1500)
-  })
-}
 
 export const useConversationStore = create<ConversationState>((set, get) => ({
   // Initial state
@@ -67,10 +58,50 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
   decisions: [],
   categories: initialCategories,
   expandedCategories: ['purpose'],
+  aiServiceId: DEFAULT_AI_SERVICE,
   
-  // Actions
-  sendMessage: async (content) => {
-    // Add user message
+  // Initialize AI services
+  initializeAIServices: () => {
+    // Initialize available AI services
+    Object.entries(AI_SERVICE_CONFIGS).forEach(([id, config]) => {
+      if (config.apiKey) {
+        try {
+          aiServiceProvider.initializeService(id, config)
+          console.log(`Initialized AI service: ${id}`)
+        } catch (error) {
+          console.error(`Failed to initialize AI service ${id}:`, error)
+        }
+      }
+    })
+    
+    // Set default service
+    if (aiServiceProvider.hasService(DEFAULT_AI_SERVICE)) {
+      aiServiceProvider.setDefaultService(DEFAULT_AI_SERVICE)
+      set({ aiServiceId: DEFAULT_AI_SERVICE })
+    } else {
+      // Use the first available service as default if the specified default is not available
+      const availableServices = aiServiceProvider.getAllServices()
+      if (availableServices.length > 0) {
+        const firstServiceId = availableServices[0].id
+        aiServiceProvider.setDefaultService(firstServiceId)
+        set({ aiServiceId: firstServiceId })
+      }
+    }
+  },
+  
+  // Set active AI service
+  setAIService: (serviceId: string) => {
+    if (aiServiceProvider.hasService(serviceId)) {
+      aiServiceProvider.setDefaultService(serviceId)
+      set({ aiServiceId: serviceId })
+    } else {
+      console.error(`AI service ${serviceId} is not initialized`)
+    }
+  },
+  
+  // Send message
+  sendMessage: async (content: string) => {
+    // Add user message to the UI
     const userMessageId = uuidv4()
     const userMessage: Message = {
       id: userMessageId,
@@ -85,53 +116,70 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
       suggestions: [],
     }))
     
-    // In a real app, we would call the AI service here
     try {
-      const aiResponse = await mockAIResponse(content)
+      // Add message to conversation service
+      conversationService.addMessage('user', content)
       
-      // Add AI response
-      const aiMessage: Message = {
-        id: uuidv4(),
+      // Create a placeholder for the assistant's response
+      const assistantMessageId = uuidv4()
+      const assistantMessage: Message = {
+        id: assistantMessageId,
         sender: 'ai',
-        content: aiResponse,
+        content: '',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       }
       
       set((state) => ({
-        messages: [...state.messages, aiMessage],
-        isProcessing: false,
-        suggestions: [
-          'Tell me more about that',
-          'What features do you need?',
-          'Who are your target users?',
-        ],
+        messages: [...state.messages, assistantMessage],
       }))
       
-      // For demonstration - add a sample decision when the user mentions an app
-      if (content.toLowerCase().includes('app')) {
-        const decision: Omit<Decision, 'id'> = {
-          title: 'App Type Identified',
-          details: `Based on your description, it sounds like you're interested in building ${
-            content.toLowerCase().includes('social') ? 'a social networking app' :
-            content.toLowerCase().includes('e-commerce') ? 'an e-commerce platform' :
-            'a mobile application'
-          }.`,
-          status: 'pending',
-          category: 'purpose',
-          relatedMessageIds: [userMessageId],
-        }
+      // Get streaming response from AI
+      let messageContent = ''
+      
+      const result = await conversationService.streamMessage(content, (chunk) => {
+        messageContent += chunk.content
         
-        get().addDecision(decision)
+        // Update the message in the UI
+        set((state) => ({
+          messages: state.messages.map((msg) => 
+            msg.id === assistantMessageId
+              ? { ...msg, content: messageContent }
+              : msg
+          ),
+        }))
+      })
+      
+      // Process decisions from AI
+      if (result.decisions && result.decisions.length > 0) {
+        result.decisions.forEach((decisionData) => {
+          const decision: Omit<Decision, 'id'> = {
+            title: decisionData.title || 'Untitled Decision',
+            details: decisionData.details || '',
+            status: decisionData.status as Decision['status'] || 'pending',
+            category: decisionData.category || 'purpose',
+            relatedMessageIds: [userMessageId, assistantMessageId],
+          }
+          
+          get().addDecision(decision)
+        })
       }
+      
+      // Update with suggestions and finish
+      set((state) => ({
+        isProcessing: false,
+        suggestions: result.suggestions || [],
+      }))
     } catch (error) {
-      // Handle error
+      console.error('Error sending message:', error)
+      
+      // Add error message
       set((state) => ({
         messages: [
           ...state.messages,
           {
             id: uuidv4(),
             sender: 'system',
-            content: 'Sorry, I encountered an error processing your request. Please try again.',
+            content: 'Sorry, I encountered an error. Please try again.',
             timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             status: 'error',
           },
@@ -179,6 +227,10 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
     
     set((state) => ({
       decisions: [...state.decisions, newDecision],
+      // Automatically expand the category if it's not already expanded
+      expandedCategories: state.expandedCategories.includes(decision.category)
+        ? state.expandedCategories
+        : [...state.expandedCategories, decision.category],
     }))
   },
   
