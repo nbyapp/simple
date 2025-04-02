@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React from 'react'
 import styled from 'styled-components'
 import CategorySection from './CategorySection'
 import DecisionCard, { DecisionStatus } from './DecisionCard'
@@ -6,7 +6,7 @@ import DecisionCard, { DecisionStatus } from './DecisionCard'
 export interface Decision {
   id: string
   title: string
-  description?: string
+  details: string
   status: DecisionStatus
   category: string
   relatedMessageIds: string[]
@@ -19,72 +19,60 @@ export interface Category {
 }
 
 interface SummaryPanelProps {
-  decisions: Decision[]
   categories: Category[]
-  onViewRelatedMessages: (messageIds: string[]) => void
-  onEditDecision?: (decisionId: string) => void
+  decisions: Decision[]
+  expandedCategories: string[]
+  onToggleCategory: (categoryId: string) => void
+  onViewDecision: (messageIds: string[]) => void
 }
 
 const SummaryPanel: React.FC<SummaryPanelProps> = ({
-  decisions,
   categories,
-  onViewRelatedMessages,
-  onEditDecision,
+  decisions,
+  expandedCategories,
+  onToggleCategory,
+  onViewDecision,
 }) => {
-  const [expandedCategories, setExpandedCategories] = useState<string[]>(['purpose'])
-
-  const toggleCategory = (categoryId: string) => {
-    setExpandedCategories(prev => 
-      prev.includes(categoryId)
-        ? prev.filter(id => id !== categoryId)
-        : [...prev, categoryId]
-    )
+  const getDecisionsForCategory = (categoryId: string) => {
+    return decisions.filter(decision => decision.category === categoryId)
   }
-
-  const handleEditDecision = (decisionId: string) => {
-    onEditDecision?.(decisionId)
-  }
-
-  const isEmpty = decisions.length === 0
 
   return (
     <Container>
       <Header>
         <Title>App Summary</Title>
       </Header>
-
       <Content>
-        {isEmpty ? (
+        {categories.length === 0 ? (
           <EmptyState>
             Your app details will appear here as we discuss your requirements.
           </EmptyState>
         ) : (
           categories.map(category => {
-            const categoryDecisions = decisions.filter(
-              decision => decision.category === category.id
-            )
-
-            if (categoryDecisions.length === 0) return null
-
+            const categoryDecisions = getDecisionsForCategory(category.id)
+            
             return (
               <CategorySection
                 key={category.id}
                 title={category.title}
                 icon={category.icon}
                 expanded={expandedCategories.includes(category.id)}
-                onToggle={() => toggleCategory(category.id)}
+                onToggle={() => onToggleCategory(category.id)}
               >
-                {categoryDecisions.map(decision => (
-                  <DecisionCard
-                    key={decision.id}
-                    title={decision.title}
-                    description={decision.description}
-                    status={decision.status}
-                    relatedMessageIds={decision.relatedMessageIds}
-                    onViewRelatedMessages={onViewRelatedMessages}
-                    onEdit={() => handleEditDecision(decision.id)}
-                  />
-                ))}
+                {categoryDecisions.length === 0 ? (
+                  <EmptyCategory>No decisions in this category yet.</EmptyCategory>
+                ) : (
+                  categoryDecisions.map(decision => (
+                    <DecisionCard
+                      key={decision.id}
+                      title={decision.title}
+                      details={decision.details}
+                      status={decision.status}
+                      relatedMessageIds={decision.relatedMessageIds}
+                      onView={onViewDecision}
+                    />
+                  ))
+                )}
               </CategorySection>
             )
           })
@@ -97,9 +85,9 @@ const SummaryPanel: React.FC<SummaryPanelProps> = ({
 const Container = styled.div`
   display: flex;
   flex-direction: column;
+  flex: 2;
   height: 100%;
   background-color: ${({ theme }) => theme.colors.surface};
-  flex: 2;
 `
 
 const Header = styled.div`
@@ -108,10 +96,9 @@ const Header = styled.div`
 `
 
 const Title = styled.h2`
-  font-size: ${({ theme }) => theme.typography.heading.h4.fontSize};
-  font-weight: ${({ theme }) => theme.typography.heading.h4.fontWeight};
+  font-size: ${({ theme }) => theme.typography.heading.h3.fontSize};
+  font-weight: ${({ theme }) => theme.typography.heading.h3.fontWeight};
   color: ${({ theme }) => theme.colors.text.primary};
-  margin: 0;
 `
 
 const Content = styled.div`
@@ -131,6 +118,14 @@ const EmptyState = styled.div`
   color: ${({ theme }) => theme.colors.text.secondary};
   text-align: center;
   font-size: ${({ theme }) => theme.typography.body.small.fontSize};
+`
+
+const EmptyCategory = styled.div`
+  padding: ${({ theme }) => theme.spacing.md};
+  color: ${({ theme }) => theme.colors.text.tertiary};
+  font-size: ${({ theme }) => theme.typography.body.small.fontSize};
+  font-style: italic;
+  text-align: center;
 `
 
 export default SummaryPanel
