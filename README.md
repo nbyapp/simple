@@ -48,13 +48,15 @@ npm install
 yarn
 ```
 
-3. Create a `.env` file in the root directory with your API keys:
+3. Create a `.env.local` file in the root directory with your API keys:
 
 ```
 VITE_OPENAI_API_KEY=your_openai_api_key_here
 VITE_ANTHROPIC_API_KEY=your_anthropic_api_key_here
 VITE_DEFAULT_AI_SERVICE=openai
 ```
+
+> ⚠️ **Important**: `.env.local` files contain sensitive API keys and should never be committed to the repository. The file is already added to `.gitignore`.
 
 4. Start the development server:
 
@@ -65,6 +67,14 @@ yarn dev
 ```
 
 The application will be available at `http://localhost:5173`.
+
+### Environment Files
+
+The project uses the following environment files:
+
+- `.env.example` - Template with required variables (safe to commit)
+- `.env.development` - Development environment settings without secrets (safe to commit)
+- `.env.local` - Local environment variables with your actual API keys (never commit this)
 
 ## Project Structure
 

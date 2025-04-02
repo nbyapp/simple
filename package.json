@@ -9,7 +9,9 @@
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
     "storybook": "storybook dev -p 6006",
-    "build-storybook": "storybook build"
+    "build-storybook": "storybook build",
+    "check-env-gitignore": "grep -q '.env.local' .gitignore || echo 'Warning: .env.local is not in .gitignore!'",
+    "setup-env": "bash ./setup-env.sh"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.16.0",
