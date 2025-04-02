@@ -1,6 +1,7 @@
 import { BaseAIService } from './base';
 import { AIMessage, AICompletionResponse, AIStreamChunk, AIServiceConfig, AIServiceFactory } from './types';
 import Anthropic from '@anthropic-ai/sdk';
+import { createProxyFetch } from './proxy';
 
 /**
  * Anthropic service adapter
@@ -14,9 +15,17 @@ export class AnthropicService extends BaseAIService {
   constructor(config: AIServiceConfig) {
     super(config);
     
+    // Create a fetch function that uses our proxy to avoid CORS issues
+    const proxyFetch = createProxyFetch(
+      config.baseUrl || 'https://api.anthropic.com',
+      config.apiKey
+    );
+    
+    // Initialize the Anthropic client with our custom fetch
     this.client = new Anthropic({
       apiKey: config.apiKey,
       baseURL: config.baseUrl || undefined,
+      fetch: proxyFetch as any, // Type assertion needed for compatibility
     });
   }
   
@@ -59,13 +68,18 @@ export class AnthropicService extends BaseAIService {
       params.system = formattedData.system;
     }
     
-    if (stream) {
-      return this.client.messages.create({
-        ...params,
-        stream: true,
-      });
-    } else {
-      return this.client.messages.create(params);
+    try {
+      if (stream) {
+        return this.client.messages.create({
+          ...params,
+          stream: true,
+        });
+      } else {
+        return this.client.messages.create(params);
+      }
+    } catch (error) {
+      console.error("Error in Anthropic API call:", error);
+      throw error;
     }
   }
   
