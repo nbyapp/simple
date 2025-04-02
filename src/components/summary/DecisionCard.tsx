@@ -1,55 +1,66 @@
-import React from 'react'
+import React, { useState } from 'react'
 import styled from 'styled-components'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 
 export type DecisionStatus = 'confirmed' | 'pending' | 'conflicting'
 
 export interface DecisionCardProps {
   title: string
-  description: string
+  details: string
   status: DecisionStatus
   relatedMessageIds?: string[]
-  onHighlightConversation?: (messageIds: string[]) => void
+  onView?: (messageIds: string[]) => void
 }
 
 const DecisionCard: React.FC<DecisionCardProps> = ({
   title,
-  description,
+  details,
   status,
   relatedMessageIds = [],
-  onHighlightConversation,
+  onView,
 }) => {
+  const [isExpanded, setIsExpanded] = useState(false)
+
+  const handleExpandToggle = () => {
+    setIsExpanded(!isExpanded)
+  }
+
+  const handleView = () => {
+    if (relatedMessageIds.length > 0 && onView) {
+      onView(relatedMessageIds)
+    }
+  }
+
   return (
     <Container
+      status={status}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
-      status={status}
-      onClick={() => {
-        if (relatedMessageIds.length > 0 && onHighlightConversation) {
-          onHighlightConversation(relatedMessageIds)
-        }
-      }}
     >
-      <Header>
+      <Header onClick={handleExpandToggle}>
+        <StatusIndicator status={status} />
         <Title>{title}</Title>
-        <StatusBadge status={status}>
-          {status === 'confirmed' && 'Confirmed'}
-          {status === 'pending' && 'Pending'}
-          {status === 'conflicting' && 'Conflicting'}
-        </StatusBadge>
+        <ExpandIcon isExpanded={isExpanded} />
       </Header>
-      <Description>{description}</Description>
-      {relatedMessageIds.length > 0 && (
-        <SourceLink onClick={(e) => {
-          e.stopPropagation()
-          if (onHighlightConversation) {
-            onHighlightConversation(relatedMessageIds)
-          }
-        }}>
-          View in conversation
-        </SourceLink>
-      )}
+
+      <AnimatePresence>
+        {isExpanded && (
+          <Details
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <DetailText>{details}</DetailText>
+            {relatedMessageIds.length > 0 && (
+              <ViewButton onClick={handleView}>
+                View in conversation
+              </ViewButton>
+            )}
+          </Details>
+        )}
+      </AnimatePresence>
     </Container>
   )
 }
@@ -59,92 +70,119 @@ interface ContainerProps {
 }
 
 const Container = styled(motion.div)<ContainerProps>`
-  background-color: ${({ theme }) => theme.colors.background};
-  border-radius: ${({ theme }) => theme.borderRadius.md};
-  padding: ${({ theme }) => theme.spacing.md};
   margin-bottom: ${({ theme }) => theme.spacing.md};
+  border-radius: ${({ theme }) => theme.borderRadius.md};
+  background-color: white;
+  overflow: hidden;
   box-shadow: ${({ theme }) => theme.shadows.sm};
-  cursor: pointer;
-  transition: box-shadow ${({ theme }) => theme.transitions.quick};
-  border-left: 4px solid transparent;
-  
-  ${({ status, theme }) => {
-    if (status === 'confirmed') {
-      return `border-left-color: ${theme.colors.status.success};`
-    } else if (status === 'pending') {
-      return `border-left-color: ${theme.colors.status.info};`
-    } else if (status === 'conflicting') {
-      return `border-left-color: ${theme.colors.status.warning};`
+  border: 1px solid ${({ status, theme }) => {
+    switch (status) {
+      case 'confirmed':
+        return `${theme.colors.status.success}66`;
+      case 'pending':
+        return `${theme.colors.status.info}66`;
+      case 'conflicting':
+        return `${theme.colors.status.warning}66`;
+      default:
+        return `${theme.colors.text.tertiary}33`;
     }
-    return '';
-  }}
-  
-  &:hover {
-    box-shadow: ${({ theme }) => theme.shadows.md};
-  }
+  }};
 `
 
 const Header = styled.div`
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: ${({ theme }) => theme.spacing.sm};
+  padding: ${({ theme }) => theme.spacing.md};
+  cursor: pointer;
+  user-select: none;
 `
 
-const Title = styled.h3`
-  font-size: ${({ theme }) => theme.typography.body.regular.fontSize};
-  font-weight: 600;
-  color: ${({ theme }) => theme.colors.text.primary};
-`
-
-interface StatusBadgeProps {
+interface StatusIndicatorProps {
   status: DecisionStatus
 }
 
-const StatusBadge = styled.span<StatusBadgeProps>`
-  padding: ${({ theme }) => `${theme.spacing.xs} ${theme.spacing.sm}`};
-  border-radius: ${({ theme }) => theme.borderRadius.pill};
-  font-size: ${({ theme }) => theme.typography.body.tiny.fontSize};
-  font-weight: 500;
-  
-  ${({ status, theme }) => {
-    if (status === 'confirmed') {
-      return `
-        background-color: ${theme.colors.status.success}22;
-        color: ${theme.colors.status.success};
-      `
-    } else if (status === 'pending') {
-      return `
-        background-color: ${theme.colors.status.info}22;
-        color: ${theme.colors.status.info};
-      `
-    } else if (status === 'conflicting') {
-      return `
-        background-color: ${theme.colors.status.warning}22;
-        color: ${theme.colors.status.warning};
-      `
+const StatusIndicator = styled.div<StatusIndicatorProps>`
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: ${({ theme }) => theme.spacing.sm};
+  background-color: ${({ status, theme }) => {
+    switch (status) {
+      case 'confirmed':
+        return theme.colors.status.success;
+      case 'pending':
+        return theme.colors.status.info;
+      case 'conflicting':
+        return theme.colors.status.warning;
+      default:
+        return theme.colors.text.tertiary;
     }
-    return '';
-  }}
+  }};
 `
 
-const Description = styled.p`
+const Title = styled.div`
+  flex: 1;
+  font-weight: 600;
+  font-size: ${({ theme }) => theme.typography.body.regular.fontSize};
+`
+
+interface ExpandIconProps {
+  isExpanded: boolean
+}
+
+const ExpandIcon = styled.div<ExpandIconProps>`
+  width: 18px;
+  height: 18px;
+  position: relative;
+  
+  &:before, &:after {
+    content: '';
+    position: absolute;
+    background-color: ${({ theme }) => theme.colors.text.secondary};
+    transition: transform ${({ theme }) => theme.transitions.quick};
+  }
+  
+  /* Horizontal line */
+  &:before {
+    top: 50%;
+    left: 0;
+    right: 0;
+    height: 2px;
+    transform: translateY(-50%);
+  }
+  
+  /* Vertical line */
+  &:after {
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    width: 2px;
+    transform: translateX(-50%) ${({ isExpanded }) => isExpanded ? 'scaleY(0)' : 'scaleY(1)'};
+  }
+`
+
+const Details = styled(motion.div)`
+  padding: 0 ${({ theme }) => theme.spacing.md} ${({ theme }) => theme.spacing.md};
+  overflow: hidden;
+`
+
+const DetailText = styled.p`
   font-size: ${({ theme }) => theme.typography.body.small.fontSize};
   color: ${({ theme }) => theme.colors.text.secondary};
   margin-bottom: ${({ theme }) => theme.spacing.md};
+  line-height: 1.5;
 `
 
-const SourceLink = styled.button`
+const ViewButton = styled.button`
+  font-size: ${({ theme }) => theme.typography.body.small.fontSize};
   color: ${({ theme }) => theme.colors.primary};
-  font-size: ${({ theme }) => theme.typography.body.tiny.fontSize};
-  background: none;
-  border: none;
-  padding: 0;
-  text-decoration: underline;
-  cursor: pointer;
+  padding: ${({ theme }) => theme.spacing.xs} ${({ theme }) => theme.spacing.md};
+  border-radius: ${({ theme }) => theme.borderRadius.sm};
+  background-color: ${({ theme }) => `${theme.colors.primary}11`};
+  transition: background-color ${({ theme }) => theme.transitions.quick};
   
   &:hover {
-    opacity: 0.8;
+    background-color: ${({ theme }) => `${theme.colors.primary}22`};
   }
 `
 
