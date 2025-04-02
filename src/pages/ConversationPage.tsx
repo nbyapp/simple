@@ -3,6 +3,7 @@ import styled from 'styled-components'
 import { Link } from 'react-router-dom'
 import ConversationPanel from '../components/conversation/ConversationPanel'
 import SummaryPanel from '../components/summary/SummaryPanel'
+import AIServiceSelector from '../components/settings/AIServiceSelector'
 import { useConversationStore } from '../store/conversationStore'
 
 const ConversationPage: React.FC = () => {
@@ -25,6 +26,7 @@ const ConversationPage: React.FC = () => {
         <LogoLink to="/">
           <Title>Simple</Title>
         </LogoLink>
+        <AIServiceSelector />
       </Header>
       
       <MainContent>
