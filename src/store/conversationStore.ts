@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { v4 as uuidv4 } from 'uuid'
 import { Message } from '../components/conversation/MessageList'
 import { Decision, Category } from '../components/summary/SummaryPanel'
-import { conversationService, aiServiceProvider } from '../services/ai'
+import { conversationService, aiServiceProvider, AIModelOption } from '../services/ai'
 import { AI_SERVICE_CONFIGS, DEFAULT_AI_SERVICE } from '../config/ai'
 
 interface ConversationState {
@@ -19,6 +19,7 @@ interface ConversationState {
   
   // AI service configuration
   aiServiceId: string
+  aiModels: Record<string, AIModelOption[]>
   
   // Actions
   sendMessage: (content: string) => Promise<void>
@@ -27,7 +28,9 @@ interface ConversationState {
   addDecision: (decision: Omit<Decision, 'id'>) => void
   updateDecision: (id: string, updates: Partial<Omit<Decision, 'id'>>) => void
   setAIService: (serviceId: string) => void
+  setModel: (serviceId: string, modelId: string) => void
   initializeAIServices: () => void
+  getSelectedModel: (serviceId: string) => string
 }
 
 // Initial categories
@@ -59,18 +62,28 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
   categories: initialCategories,
   expandedCategories: ['purpose'],
   aiServiceId: DEFAULT_AI_SERVICE,
+  aiModels: {},
   
   // Initialize AI services
   initializeAIServices: () => {
     // Initialize available AI services
     Object.entries(AI_SERVICE_CONFIGS).forEach(([id, config]) => {
-      if (config.apiKey) {
-        try {
-          aiServiceProvider.initializeService(id, config)
-          console.log(`Initialized AI service: ${id}`)
-        } catch (error) {
-          console.error(`Failed to initialize AI service ${id}:`, error)
-        }
+      try {
+        aiServiceProvider.initializeService(id, config)
+        console.log(`Initialized AI service: ${id}`)
+        
+        // Store the available models for this service
+        const service = aiServiceProvider.getService(id)
+        const models = service.getAvailableModels()
+        
+        set(state => ({
+          aiModels: {
+            ...state.aiModels,
+            [id]: models
+          }
+        }))
+      } catch (error) {
+        console.error(`Failed to initialize AI service ${id}:`, error)
       }
     })
     
@@ -99,6 +112,34 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
       set({ aiServiceId: serviceId })
     } else {
       console.error(`AI service ${serviceId} is not initialized`)
+    }
+  },
+  
+  // Get the selected model for a service
+  getSelectedModel: (serviceId: string) => {
+    if (!aiServiceProvider.hasService(serviceId)) {
+      return ''
+    }
+    
+    try {
+      return aiServiceProvider.getSelectedModel(serviceId)
+    } catch (error) {
+      console.error(`Error getting selected model for ${serviceId}:`, error)
+      return ''
+    }
+  },
+  
+  // Set the model for a service
+  setModel: (serviceId: string, modelId: string) => {
+    if (!aiServiceProvider.hasService(serviceId)) {
+      console.error(`AI service ${serviceId} is not initialized`)
+      return
+    }
+    
+    try {
+      aiServiceProvider.setModel(serviceId, modelId)
+    } catch (error) {
+      console.error(`Error setting model for ${serviceId}:`, error)
     }
   },
   
