@@ -7,7 +7,6 @@ interface ConversationPanelProps {
   initialMessages?: Message[]
   onSendMessage: (message: string) => void
   isProcessing?: boolean
-  suggestions?: string[]
   highlightedMessageIds?: string[]
 }
 
@@ -15,31 +14,27 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({
   initialMessages = [],
   onSendMessage,
   isProcessing = false,
-  suggestions = [],
   highlightedMessageIds = [],
 }) => {
   const [messages] = useState<Message[]>(initialMessages)
-
-  const handleSendMessage = (content: string) => {
-    onSendMessage(content)
-  }
-
-  const handleSuggestionClick = (suggestion: string) => {
-    onSendMessage(suggestion)
-  }
+  const [suggestions] = useState<string[]>([
+    'I want to build a fitness app',
+    'Create a photo sharing app',
+    'I need a task management app',
+  ])
 
   return (
     <Container>
       <MessageList 
-        messages={messages}
+        messages={messages} 
         isTyping={isProcessing}
         highlightedMessageIds={highlightedMessageIds}
       />
-      <InputArea
-        onSendMessage={handleSendMessage}
+      <InputArea 
+        onSendMessage={onSendMessage}
         isProcessing={isProcessing}
         suggestions={suggestions}
-        onSuggestionClick={handleSuggestionClick}
+        onSuggestionClick={onSendMessage}
       />
     </Container>
   )
@@ -48,8 +43,8 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({
 const Container = styled.div`
   display: flex;
   flex-direction: column;
-  height: 100%;
   flex: 1;
+  overflow: hidden;
   border-right: 1px solid ${({ theme }) => `${theme.colors.text.tertiary}33`};
 `
 
