@@ -85,6 +85,9 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
         const firstServiceId = availableServices[0].id
         aiServiceProvider.setDefaultService(firstServiceId)
         set({ aiServiceId: firstServiceId })
+      } else {
+        // If no services are available, still provide a graceful fallback
+        console.warn('No AI services available - using fallback mode')
       }
     }
   },
@@ -165,27 +168,48 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
       }
       
       // Update with suggestions and finish
-      set((state) => ({
+      set({
         isProcessing: false,
         suggestions: result.suggestions || [],
-      }))
+      })
     } catch (error) {
       console.error('Error sending message:', error)
       
-      // Add error message
-      set((state) => ({
-        messages: [
-          ...state.messages,
-          {
-            id: uuidv4(),
-            sender: 'system',
-            content: 'Sorry, I encountered an error. Please try again.',
-            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            status: 'error',
-          },
-        ],
-        isProcessing: false,
-      }))
+      // Add fallback error message if the message wasn't added by conversation service
+      set((state) => {
+        // Check if an AI message was already added with content
+        const hasAiResponse = state.messages.some(m => 
+          m.sender === 'ai' && 
+          m.content && 
+          m.content.length > 0 && 
+          state.messages.indexOf(m) > state.messages.findIndex(msg => msg.id === userMessageId)
+        )
+        
+        if (!hasAiResponse) {
+          return {
+            messages: [
+              ...state.messages,
+              {
+                id: uuidv4(),
+                sender: 'system',
+                content: 'Sorry, I encountered an error. Please try again or switch to a different AI service.',
+                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                status: 'error',
+              },
+            ],
+            isProcessing: false,
+            suggestions: [
+              'I want to build a social app',
+              'Help me create a productivity tool',
+              'I need an e-commerce app',
+            ],
+          }
+        }
+        
+        return {
+          isProcessing: false,
+        }
+      })
     }
   },
   
