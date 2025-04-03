@@ -24,7 +24,7 @@ const AIServiceSelector: React.FC = () => {
     return (
       <Container>
         <NoServicesMessage>
-          Using mock services. Add API keys for real AI.
+          API key missing. See .env.example.
         </NoServicesMessage>
       </Container>
     );
@@ -34,7 +34,11 @@ const AIServiceSelector: React.FC = () => {
     <Container>
       <SelectorGroup>
         <Label>AI:</Label>
-        <Select value={aiServiceId} onChange={handleServiceChange}>
+        <Select 
+          value={aiServiceId || ''} 
+          onChange={handleServiceChange}
+          disabled={availableServices.length <= 1}
+        >
           {availableServices.map((service) => (
             <option key={service.id} value={service.id}>
               {service.name}
@@ -79,6 +83,11 @@ const Select = styled.select`
   
   &:focus {
     border-color: ${({ theme }) => theme.colors.primary};
+  }
+  
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.7;
   }
 `;
 
