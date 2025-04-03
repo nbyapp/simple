@@ -23,7 +23,7 @@ const InputArea: React.FC<InputAreaProps> = ({
   useEffect(() => {
     if (textAreaRef.current) {
       textAreaRef.current.style.height = 'auto'
-      textAreaRef.current.style.height = `${textAreaRef.current.scrollHeight}px`
+      textAreaRef.current.style.height = `${Math.min(textAreaRef.current.scrollHeight, 200)}px`
     }
   }, [inputValue])
 
@@ -37,6 +37,11 @@ const InputArea: React.FC<InputAreaProps> = ({
     if (inputValue.trim() && !isProcessing) {
       onSendMessage(inputValue.trim())
       setInputValue('')
+
+      // Reset height
+      if (textAreaRef.current) {
+        textAreaRef.current.style.height = 'auto'
+      }
     }
   }
 
@@ -49,19 +54,6 @@ const InputArea: React.FC<InputAreaProps> = ({
 
   return (
     <Container>
-      {suggestions.length > 0 && (
-        <SuggestionsContainer>
-          {suggestions.map((suggestion) => (
-            <SuggestionChip
-              key={suggestion}
-              onClick={() => onSuggestionClick?.(suggestion)}
-            >
-              {suggestion}
-            </SuggestionChip>
-          ))}
-        </SuggestionsContainer>
-      )}
-
       <InputContainer isFocused={isFocused}>
         <StyledForm onSubmit={handleSubmit}>
           <StyledTextArea
@@ -69,7 +61,7 @@ const InputArea: React.FC<InputAreaProps> = ({
             value={inputValue}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
-            placeholder="Describe your app idea..."
+            placeholder="Type your message here..."
             disabled={isProcessing}
             onFocus={() => setIsFocused(true)}
             onBlur={() => setIsFocused(false)}
@@ -98,6 +90,12 @@ const InputArea: React.FC<InputAreaProps> = ({
           </SendButtonContainer>
         </StyledForm>
       </InputContainer>
+      
+      {isProcessing && (
+        <ProcessingIndicator>
+          AI is thinking<Dot>.</Dot><Dot>.</Dot><Dot>.</Dot>
+        </ProcessingIndicator>
+      )}
     </Container>
   )
 }
@@ -107,28 +105,36 @@ const Container = styled.div`
   flex-direction: column;
   width: 100%;
   padding: ${({ theme }) => theme.spacing.md};
-  background-color: ${({ theme }) => theme.colors.background};
-  border-top: 1px solid ${({ theme }) => `${theme.colors.text.tertiary}33`};
+  background-color: ${({ theme }) => theme.colors.surface};
+  position: relative;
 `
 
-const SuggestionsContainer = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  gap: ${({ theme }) => theme.spacing.sm};
-  margin-bottom: ${({ theme }) => theme.spacing.md};
-`
-
-const SuggestionChip = styled.button`
-  background-color: ${({ theme }) => `${theme.colors.primary}11`};
-  color: ${({ theme }) => theme.colors.primary};
-  padding: ${({ theme }) => theme.spacing.xs} ${({ theme }) => theme.spacing.md};
+const ProcessingIndicator = styled.div`
+  position: absolute;
+  top: -24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: ${({ theme }) => theme.colors.primary};
+  color: ${({ theme }) => theme.colors.text.onPrimary};
+  padding: ${({ theme }) => `${theme.spacing.xxs} ${theme.spacing.md}`};
   border-radius: ${({ theme }) => theme.borderRadius.pill};
-  font-size: ${({ theme }) => theme.typography.body.small.fontSize};
-  transition: all ${({ theme }) => theme.transitions.quick};
-  white-space: nowrap;
+  font-size: ${({ theme }) => theme.typography.body.tiny.fontSize};
+  box-shadow: ${({ theme }) => theme.shadows.md};
+  display: flex;
+  align-items: center;
+`
+
+const Dot = styled.span`
+  animation: pulse 1.5s infinite;
+  animation-delay: ${(props) => props.children === '.' ? '0s' : props.children === '..' ? '0.5s' : '1s'};
   
-  &:hover {
-    background-color: ${({ theme }) => `${theme.colors.primary}22`};
+  @keyframes pulse {
+    0%, 100% {
+      opacity: 0.3;
+    }
+    50% {
+      opacity: 1;
+    }
   }
 `
 
@@ -141,16 +147,22 @@ const InputContainer = styled.div<InputContainerProps>`
   border: 1px solid ${({ theme, isFocused }) => 
     isFocused 
       ? theme.colors.primary
-      : `${theme.colors.text.tertiary}66`
+      : theme.colors.divider
   };
-  border-radius: ${({ theme }) => theme.borderRadius.md};
-  transition: border-color ${({ theme }) => theme.transitions.quick};
+  border-radius: ${({ theme }) => theme.borderRadius.lg};
+  transition: all ${({ theme }) => theme.transitions.quick};
   background-color: ${({ theme }) => theme.colors.background};
+  box-shadow: ${({ theme, isFocused }) => 
+    isFocused 
+      ? theme.shadows.focus
+      : 'none'
+  };
 `
 
 const StyledForm = styled.form`
   display: flex;
   flex: 1;
+  align-items: flex-end;
 `
 
 const StyledTextArea = styled.textarea`
@@ -161,8 +173,9 @@ const StyledTextArea = styled.textarea`
   resize: none;
   font-family: ${({ theme }) => theme.typography.fontFamily};
   font-size: ${({ theme }) => theme.typography.body.regular.fontSize};
-  max-height: 150px;
+  max-height: 200px;
   background-color: transparent;
+  color: ${({ theme }) => theme.colors.text.primary};
   
   &::placeholder {
     color: ${({ theme }) => theme.colors.text.tertiary};
@@ -177,21 +190,26 @@ const StyledTextArea = styled.textarea`
 const SendButtonContainer = styled.div`
   display: flex;
   align-items: flex-end;
-  padding: ${({ theme }) => theme.spacing.sm};
+  padding-right: ${({ theme }) => theme.spacing.sm};
+  padding-bottom: ${({ theme }) => theme.spacing.sm};
 `
 
 const SendButton = styled(motion.button)`
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  border-radius: ${({ theme }) => theme.borderRadius.circular};
   background-color: ${({ theme }) => theme.colors.primary};
   color: white;
   
+  &:hover {
+    background-color: ${({ theme }) => theme.colors.primaryDark};
+  }
+  
   &:disabled {
-    background-color: ${({ theme }) => `${theme.colors.primary}88`};
+    background-color: ${({ theme }) => theme.colors.primaryLight};
     cursor: not-allowed;
   }
 `
@@ -209,8 +227,8 @@ const SendIcon = () => (
 )
 
 const LoadingIndicator = styled.div`
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   border: 2px solid rgba(255, 255, 255, 0.3);
   border-radius: 50%;
   border-top-color: white;
