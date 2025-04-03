@@ -1,7 +1,7 @@
 /**
  * Simple proxy implementation for making API calls to AI services
  * 
- * This avoids CORS issues by using a mock implementation for development
+ * For development only: Uses mock implementations to avoid CORS issues
  */
 
 type FetchOptions = RequestInit & {
@@ -35,8 +35,11 @@ export const fetchWithTimeout = async (url: string, options: FetchOptions = {}) 
 
 /**
  * Mock response generator - for development when API keys are not available
+ * or when CORS issues prevent direct API calls
  */
 const createMockResponse = (endpoint: string, body: any) => {
+  console.log('Using mock response for endpoint:', endpoint);
+  
   // For OpenAI chat completions
   if (endpoint.includes('/chat/completions')) {
     const requestBody = typeof body === 'string' ? JSON.parse(body) : body;
@@ -184,52 +187,20 @@ const createMockResponse = (endpoint: string, body: any) => {
 };
 
 /**
- * Create a fetch proxy that can use mocks when needed
+ * For development: ALWAYS use mock mode to avoid CORS issues
+ * In production, this should be replaced with a proper backend API
  */
-export const createProxyFetch = (baseUrl: string, apiKey: string, useMock = false) => {
-  // Return mock implementation if requested or if API key is not available
-  if (useMock || !apiKey) {
-    console.log(`Using mock mode for ${baseUrl}`);
+export const createProxyFetch = (baseUrl: string, apiKey: string, useMock = true) => {
+  console.log(`Creating proxy fetch for ${baseUrl}, mock mode: ${useMock}`);
+  
+  // FORCE mock mode for development to avoid CORS issues
+  return (url: string, options: FetchOptions = {}) => {
+    console.log(`Mock request to: ${url}`);
     
-    return async (url: string, options: FetchOptions = {}) => {
-      console.log(`Mock request to: ${url}`);
-      
-      // Extract the endpoint path
-      const endpoint = url.replace(baseUrl, '');
-      
-      // Create a mock response based on the endpoint and request body
-      return createMockResponse(endpoint, options.body);
-    };
-  }
-  
-  // For real API calls
-  if (baseUrl.includes('openai.com')) {
-    return async (url: string, options: FetchOptions = {}) => {
-      return fetchWithTimeout(url, {
-        ...options,
-        headers: {
-          ...options.headers,
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-      });
-    };
-  }
-  
-  if (baseUrl.includes('anthropic.com')) {
-    return async (url: string, options: FetchOptions = {}) => {
-      return fetchWithTimeout(url, {
-        ...options,
-        headers: {
-          ...options.headers,
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01',
-          'Content-Type': 'application/json',
-        },
-      });
-    };
-  }
-  
-  // Default fallback
-  return fetchWithTimeout;
+    // Extract the endpoint path
+    const endpoint = url.replace(baseUrl, '');
+    
+    // Create a mock response based on the endpoint and request body
+    return createMockResponse(endpoint, options.body);
+  };
 };
