@@ -66,122 +66,132 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
   
   // Initialize AI services
   initializeAIServices: () => {
-    // Initialize available AI services
-    Object.entries(AI_SERVICE_CONFIGS).forEach(([id, config]) => {
-      try {
-        aiServiceProvider.initializeService(id, config)
-        console.log(`Initialized AI service: ${id}`)
-        
-        // Store the available models for this service
-        const service = aiServiceProvider.getService(id)
-        const models = service.getAvailableModels()
-        
-        set(state => ({
-          aiModels: {
-            ...state.aiModels,
-            [id]: models
-          }
-        }))
-      } catch (error) {
-        console.error(`Failed to initialize AI service ${id}:`, error)
-      }
-    })
+    console.log('Initializing AI services...');
     
-    // Set default service
-    if (aiServiceProvider.hasService(DEFAULT_AI_SERVICE)) {
-      aiServiceProvider.setDefaultService(DEFAULT_AI_SERVICE)
-      set({ aiServiceId: DEFAULT_AI_SERVICE })
-    } else {
-      // Use the first available service as default if the specified default is not available
-      const availableServices = aiServiceProvider.getAllServices()
-      if (availableServices.length > 0) {
-        const firstServiceId = availableServices[0].id
-        aiServiceProvider.setDefaultService(firstServiceId)
-        set({ aiServiceId: firstServiceId })
+    try {
+      // Initialize both services with mock keys if needed
+      Object.entries(AI_SERVICE_CONFIGS).forEach(([id, config]) => {
+        try {
+          console.log(`Initializing service: ${id}`);
+          aiServiceProvider.initializeService(id, config);
+          console.log(`Successfully initialized AI service: ${id}`);
+          
+          // Store the available models for this service
+          const service = aiServiceProvider.getService(id);
+          const models = service.getAvailableModels();
+          
+          set(state => ({
+            aiModels: {
+              ...state.aiModels,
+              [id]: models
+            }
+          }));
+        } catch (error) {
+          console.error(`Failed to initialize AI service ${id}:`, error);
+        }
+      });
+      
+      // Set default service
+      if (aiServiceProvider.hasService(DEFAULT_AI_SERVICE)) {
+        aiServiceProvider.setDefaultService(DEFAULT_AI_SERVICE);
+        set({ aiServiceId: DEFAULT_AI_SERVICE });
+        console.log(`Set default AI service to: ${DEFAULT_AI_SERVICE}`);
       } else {
-        // If no services are available, still provide a graceful fallback
-        console.warn('No AI services available - using fallback mode')
+        // Use the first available service as default
+        const availableServices = aiServiceProvider.getAllServices();
+        if (availableServices.length > 0) {
+          const firstServiceId = availableServices[0].id;
+          aiServiceProvider.setDefaultService(firstServiceId);
+          set({ aiServiceId: firstServiceId });
+          console.log(`Set default AI service to first available: ${firstServiceId}`);
+        } else {
+          console.warn('No AI services available - using fallback mode');
+        }
       }
+    } catch (error) {
+      console.error('Error initializing AI services:', error);
     }
   },
   
   // Set active AI service
   setAIService: (serviceId: string) => {
     if (aiServiceProvider.hasService(serviceId)) {
-      aiServiceProvider.setDefaultService(serviceId)
-      set({ aiServiceId: serviceId })
+      aiServiceProvider.setDefaultService(serviceId);
+      set({ aiServiceId: serviceId });
+      console.log(`Switched AI service to: ${serviceId}`);
     } else {
-      console.error(`AI service ${serviceId} is not initialized`)
+      console.error(`AI service ${serviceId} is not initialized`);
     }
   },
   
   // Get the selected model for a service
   getSelectedModel: (serviceId: string) => {
     if (!aiServiceProvider.hasService(serviceId)) {
-      return ''
+      return '';
     }
     
     try {
-      return aiServiceProvider.getSelectedModel(serviceId)
+      return aiServiceProvider.getSelectedModel(serviceId);
     } catch (error) {
-      console.error(`Error getting selected model for ${serviceId}:`, error)
-      return ''
+      console.error(`Error getting selected model for ${serviceId}:`, error);
+      return '';
     }
   },
   
   // Set the model for a service
   setModel: (serviceId: string, modelId: string) => {
     if (!aiServiceProvider.hasService(serviceId)) {
-      console.error(`AI service ${serviceId} is not initialized`)
-      return
+      console.error(`AI service ${serviceId} is not initialized`);
+      return;
     }
     
     try {
-      aiServiceProvider.setModel(serviceId, modelId)
+      aiServiceProvider.setModel(serviceId, modelId);
+      console.log(`Set model for ${serviceId} to: ${modelId}`);
     } catch (error) {
-      console.error(`Error setting model for ${serviceId}:`, error)
+      console.error(`Error setting model for ${serviceId}:`, error);
     }
   },
   
   // Send message
   sendMessage: async (content: string) => {
     // Add user message to the UI
-    const userMessageId = uuidv4()
+    const userMessageId = uuidv4();
     const userMessage: Message = {
       id: userMessageId,
       sender: 'user',
       content,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    }
+    };
     
     set((state) => ({
       messages: [...state.messages, userMessage],
       isProcessing: true,
       suggestions: [],
-    }))
+    }));
     
     try {
       // Add message to conversation service
-      conversationService.addMessage('user', content)
+      conversationService.addMessage('user', content);
       
       // Create a placeholder for the assistant's response
-      const assistantMessageId = uuidv4()
+      const assistantMessageId = uuidv4();
       const assistantMessage: Message = {
         id: assistantMessageId,
         sender: 'ai',
         content: '',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      }
+      };
       
       set((state) => ({
         messages: [...state.messages, assistantMessage],
-      }))
+      }));
       
       // Get streaming response from AI
-      let messageContent = ''
+      let messageContent = '';
       
       const result = await conversationService.streamMessage(content, (chunk) => {
-        messageContent += chunk.content
+        messageContent += chunk.content;
         
         // Update the message in the UI
         set((state) => ({
@@ -190,8 +200,8 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
               ? { ...msg, content: messageContent }
               : msg
           ),
-        }))
-      })
+        }));
+      });
       
       // Process decisions from AI
       if (result.decisions && result.decisions.length > 0) {
@@ -202,19 +212,19 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
             status: decisionData.status as Decision['status'] || 'pending',
             category: decisionData.category || 'purpose',
             relatedMessageIds: [userMessageId, assistantMessageId],
-          }
+          };
           
-          get().addDecision(decision)
-        })
+          get().addDecision(decision);
+        });
       }
       
       // Update with suggestions and finish
       set({
         isProcessing: false,
         suggestions: result.suggestions || [],
-      })
+      });
     } catch (error) {
-      console.error('Error sending message:', error)
+      console.error('Error sending message:', error);
       
       // Add fallback error message if the message wasn't added by conversation service
       set((state) => {
@@ -224,7 +234,7 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
           m.content && 
           m.content.length > 0 && 
           state.messages.indexOf(m) > state.messages.findIndex(msg => msg.id === userMessageId)
-        )
+        );
         
         if (!hasAiResponse) {
           return {
@@ -244,51 +254,51 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
               'Help me create a productivity tool',
               'I need an e-commerce app',
             ],
-          }
+          };
         }
         
         return {
           isProcessing: false,
-        }
-      })
+        };
+      });
     }
   },
   
   highlightMessages: (messageIds) => {
-    set({ highlightedMessageIds: messageIds })
+    set({ highlightedMessageIds: messageIds });
     
     // Clear the highlight after 3 seconds
     setTimeout(() => {
       set((state) => {
         if (state.highlightedMessageIds.toString() === messageIds.toString()) {
-          return { highlightedMessageIds: [] }
+          return { highlightedMessageIds: [] };
         }
-        return {}
-      })
-    }, 3000)
+        return {};
+      });
+    }, 3000);
   },
   
   toggleCategory: (categoryId) => {
     set((state) => {
-      const isCurrentlyExpanded = state.expandedCategories.includes(categoryId)
+      const isCurrentlyExpanded = state.expandedCategories.includes(categoryId);
       
       if (isCurrentlyExpanded) {
         return {
           expandedCategories: state.expandedCategories.filter(id => id !== categoryId),
-        }
+        };
       } else {
         return {
           expandedCategories: [...state.expandedCategories, categoryId],
-        }
+        };
       }
-    })
+    });
   },
   
   addDecision: (decision) => {
     const newDecision: Decision = {
       ...decision,
       id: uuidv4(),
-    }
+    };
     
     set((state) => ({
       decisions: [...state.decisions, newDecision],
@@ -296,7 +306,7 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
       expandedCategories: state.expandedCategories.includes(decision.category)
         ? state.expandedCategories
         : [...state.expandedCategories, decision.category],
-    }))
+    }));
   },
   
   updateDecision: (id, updates) => {
@@ -304,6 +314,6 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
       decisions: state.decisions.map(decision => 
         decision.id === id ? { ...decision, ...updates } : decision
       ),
-    }))
+    }));
   },
-}))
+}));
