@@ -18,7 +18,7 @@ interface ConversationState {
   expandedCategories: string[]
   
   // AI service configuration
-  aiServiceId: string
+  aiServiceId: string | null
   aiModels: Record<string, AIModelOption[]>
   
   // Actions
@@ -61,52 +61,73 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
   decisions: [],
   categories: initialCategories,
   expandedCategories: ['purpose'],
-  aiServiceId: DEFAULT_AI_SERVICE,
+  aiServiceId: null, // Will be set during initialization
   aiModels: {},
   
   // Initialize AI services
   initializeAIServices: () => {
     console.log('Initializing AI services...');
     
+    // Track successfully initialized services
+    const initializedServices: string[] = [];
+    
     try {
-      // Initialize both services with mock keys if needed
+      // Initialize services with valid API keys
       Object.entries(AI_SERVICE_CONFIGS).forEach(([id, config]) => {
         try {
           console.log(`Initializing service: ${id}`);
-          aiServiceProvider.initializeService(id, config);
-          console.log(`Successfully initialized AI service: ${id}`);
+          const service = aiServiceProvider.initializeService(id, config);
           
-          // Store the available models for this service
-          const service = aiServiceProvider.getService(id);
-          const models = service.getAvailableModels();
-          
-          set(state => ({
-            aiModels: {
-              ...state.aiModels,
-              [id]: models
-            }
-          }));
+          if (service) {
+            console.log(`Successfully initialized AI service: ${id}`);
+            initializedServices.push(id);
+            
+            // Store the available models for this service
+            const models = service.getAvailableModels();
+            
+            set(state => ({
+              aiModels: {
+                ...state.aiModels,
+                [id]: models
+              }
+            }));
+          }
         } catch (error) {
           console.error(`Failed to initialize AI service ${id}:`, error);
         }
       });
       
-      // Set default service
-      if (aiServiceProvider.hasService(DEFAULT_AI_SERVICE)) {
-        aiServiceProvider.setDefaultService(DEFAULT_AI_SERVICE);
-        set({ aiServiceId: DEFAULT_AI_SERVICE });
-        console.log(`Set default AI service to: ${DEFAULT_AI_SERVICE}`);
-      } else {
-        // Use the first available service as default
-        const availableServices = aiServiceProvider.getAllServices();
-        if (availableServices.length > 0) {
-          const firstServiceId = availableServices[0].id;
+      // Handle default service selection
+      if (initializedServices.length > 0) {
+        // Try to set the specified default service if it was initialized
+        if (initializedServices.includes(DEFAULT_AI_SERVICE)) {
+          aiServiceProvider.setDefaultService(DEFAULT_AI_SERVICE);
+          set({ aiServiceId: DEFAULT_AI_SERVICE });
+          console.log(`Set default AI service to: ${DEFAULT_AI_SERVICE}`);
+        } else {
+          // Otherwise use the first available service
+          const firstServiceId = initializedServices[0];
           aiServiceProvider.setDefaultService(firstServiceId);
           set({ aiServiceId: firstServiceId });
           console.log(`Set default AI service to first available: ${firstServiceId}`);
-        } else {
-          console.warn('No AI services available - using fallback mode');
         }
+      } else {
+        // No services initialized - show a warning
+        console.warn('No AI services initialized! Add API keys to .env file');
+        
+        // Add a system message explaining the issue
+        set(state => ({
+          messages: [
+            ...state.messages,
+            {
+              id: uuidv4(),
+              sender: 'system',
+              content: 'No AI services are available. Please add your OpenAI or Anthropic API keys to the .env file.',
+              timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              status: 'error',
+            },
+          ],
+        }));
       }
     } catch (error) {
       console.error('Error initializing AI services:', error);
@@ -155,6 +176,30 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
   
   // Send message
   sendMessage: async (content: string) => {
+    // Check if we have an AI service
+    const { aiServiceId } = get();
+    if (!aiServiceId) {
+      set(state => ({
+        messages: [
+          ...state.messages,
+          {
+            id: uuidv4(),
+            sender: 'user',
+            content,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          },
+          {
+            id: uuidv4(),
+            sender: 'system',
+            content: 'No AI services are available. Please add your OpenAI or Anthropic API keys to the .env file.',
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            status: 'error',
+          },
+        ],
+      }));
+      return;
+    }
+    
     // Add user message to the UI
     const userMessageId = uuidv4();
     const userMessage: Message = {
@@ -243,7 +288,7 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
               {
                 id: uuidv4(),
                 sender: 'system',
-                content: 'Sorry, I encountered an error. Please try again or switch to a different AI service.',
+                content: 'Error: Could not connect to the AI service. This might be due to CORS restrictions in the browser. Please try setting up a backend proxy server or using a browser extension like CORS Unblock (for testing only).',
                 timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                 status: 'error',
               },
