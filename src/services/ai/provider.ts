@@ -29,21 +29,19 @@ export class AIServiceProvider {
   /**
    * Initialize an AI service from a registered factory
    */
-  initializeService(id: string, config: AIServiceConfig): AIService {
+  initializeService(id: string, config: AIServiceConfig): AIService | null {
     console.log(`Initializing AI service: ${id}`);
+    
+    // Skip initialization if no API key is provided
+    if (!config.apiKey) {
+      console.warn(`Skipping initialization of ${id} service - no API key provided`);
+      return null;
+    }
     
     const factory = this.factories.get(id);
     
     if (!factory) {
       throw new Error(`No factory registered for service ID: ${id}`);
-    }
-    
-    // Always use mock mode in development
-    config.useMock = true;
-    
-    // Ensure we have a mock key if none provided
-    if (!config.apiKey) {
-      config.apiKey = 'mock-key';
     }
     
     try {
@@ -58,7 +56,7 @@ export class AIServiceProvider {
       return service;
     } catch (error) {
       console.error(`Error creating service ${id}:`, error);
-      throw error;
+      return null;
     }
   }
   
