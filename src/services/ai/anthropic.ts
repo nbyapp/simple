@@ -26,18 +26,26 @@ async function* createCustomStream(response: Response): AsyncIterable<any> {
       buffer = lines.pop() || '';
 
       for (const line of lines) {
-        if (line.trim() === '') continue;
-        try {
-          yield JSON.parse(line);
-        } catch (e) {
-          console.warn('Error parsing JSON from stream:', e, 'Line:', line);
+        if (line.trim() === '' || line.startsWith('data: ')) {
+          const eventData = line.replace(/^data: /, '');
+          if (eventData === '[DONE]') continue;
+          try {
+            if (eventData.trim()) {
+              yield JSON.parse(eventData);
+            }
+          } catch (e) {
+            console.warn('Error parsing JSON from stream:', e, 'Line:', eventData);
+          }
         }
       }
     }
 
     if (buffer) {
       try {
-        yield JSON.parse(buffer);
+        const eventData = buffer.replace(/^data: /, '');
+        if (eventData && eventData !== '[DONE]') {
+          yield JSON.parse(eventData);
+        }
       } catch (e) {
         console.warn('Error parsing JSON from final buffer:', e);
       }
@@ -52,7 +60,7 @@ async function* createCustomStream(response: Response): AsyncIterable<any> {
  */
 export class AnthropicService extends BaseAIService {
   private client: Anthropic;
-  private proxyFetch: typeof fetch;
+  private proxyFetch: (url: string | URL | Request, options?: RequestInit) => Promise<Response>;
   
   id = 'anthropic';
   name = 'Anthropic';
@@ -65,13 +73,17 @@ export class AnthropicService extends BaseAIService {
       config.baseUrl || 'https://api.anthropic.com',
       config.apiKey,
       config.useMock || false
-    );
+    ) as unknown as (url: string | URL | Request, options?: RequestInit) => Promise<Response>;
     
     // Initialize the Anthropic client with our custom fetch
     this.client = new Anthropic({
       apiKey: config.apiKey || 'mock-key',
       baseURL: config.baseUrl || undefined,
-      fetch: this.proxyFetch as any, // Type assertion needed for compatibility
+      fetch: this.proxyFetch,
+      defaultHeaders: {
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      }
     });
   }
   
@@ -123,23 +135,31 @@ export class AnthropicService extends BaseAIService {
     }
     
     try {
-      // For streaming, we need to use a custom implementation to avoid SDK issues
+      // We'll use our proxy fetch with the appropriate endpoint for both streaming and non-streaming
       if (stream) {
-        const response = await this.proxyFetch('https://api.anthropic.com/v1/messages', {
+        // Use our proxy endpoint for streaming
+        const response = await this.proxyFetch('/v1/messages', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'x-api-key': this.config.apiKey || 'mock-key',
             'anthropic-version': '2023-06-01',
+            'anthropic-dangerous-direct-browser-access': 'true'
           },
           body: JSON.stringify(requestBody),
         });
         
-        // Return a custom stream iterator that doesn't depend on Anthropic's SDK
+        // Return a custom stream iterator
         return createCustomStream(response);
       } else {
-        // For non-streaming, we can use the SDK as normal
-        return this.client.messages.create(requestBody);
+        // For non-streaming, we can still use the SDK as it will use our proxy fetch
+        // Add headers to the client options
+        const clientOptions = {
+          headers: {
+            'anthropic-version': '2023-06-01',
+            'anthropic-dangerous-direct-browser-access': 'true'
+          }
+        };
+        return this.client.messages.create(requestBody, clientOptions);
       }
     } catch (error) {
       console.error("Error in Anthropic API call:", error);
@@ -156,7 +176,7 @@ export class AnthropicService extends BaseAIService {
   }
   
   protected parseStreamChunk(chunk: any): AIStreamChunk {
-    // Handle our custom stream format which matches Anthropic's event types
+    // Handle Anthropic's event format, which is different from OpenAI
     if (chunk.type === 'content_block_delta') {
       return {
         content: chunk.delta?.text || '',

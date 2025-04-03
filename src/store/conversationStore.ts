@@ -67,6 +67,7 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
   // Initialize AI services
   initializeAIServices: () => {
     console.log('Initializing AI services...');
+    console.log('Available configs:', Object.keys(AI_SERVICE_CONFIGS));
     
     // Track successfully initialized services
     const initializedServices: string[] = [];
@@ -74,6 +75,8 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
     try {
       // Initialize services with valid API keys
       Object.entries(AI_SERVICE_CONFIGS).forEach(([id, config]) => {
+        console.log(`Processing service ${id}, API key exists: ${!!config.apiKey}`);
+        
         try {
           console.log(`Initializing service: ${id}`);
           const service = aiServiceProvider.initializeService(id, config);
@@ -84,6 +87,7 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
             
             // Store the available models for this service
             const models = service.getAvailableModels();
+            console.log(`Available models for ${id}:`, models.map(m => m.id));
             
             set(state => ({
               aiModels: {
@@ -91,6 +95,8 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
                 [id]: models
               }
             }));
+          } else {
+            console.warn(`Service returned null: ${id}`);
           }
         } catch (error) {
           console.error(`Failed to initialize AI service ${id}:`, error);

@@ -267,10 +267,42 @@ export class ConversationService {
       
       // Parse the JSON response
       try {
-        const decisions = JSON.parse(response.content) as Partial<Decision>[];
+        // First, try to clean the response to handle potential formatting issues
+        let jsonContent = response.content.trim();
+        
+        // Check if content starts with ``` or ``` (code block markers)
+        const codeBlockStart = jsonContent.indexOf('```');
+        if (codeBlockStart !== -1) {
+          const codeBlockEnd = jsonContent.lastIndexOf('```');
+          // Extract content between code blocks
+          if (codeBlockEnd > codeBlockStart) {
+            jsonContent = jsonContent.substring(codeBlockStart + 3, codeBlockEnd).trim();
+            
+            // Remove language identifier if present (e.g., ```json)
+            const firstLineBreak = jsonContent.indexOf('\n');
+            if (firstLineBreak !== -1 && !jsonContent.substring(0, firstLineBreak).includes('{') && !jsonContent.substring(0, firstLineBreak).includes('[')) {
+              jsonContent = jsonContent.substring(firstLineBreak).trim();
+            }
+          }
+        }
+        
+        // Ensure it's a valid JSON array
+        if (!jsonContent.startsWith('[')) {
+          const arrayStart = jsonContent.indexOf('[');
+          if (arrayStart !== -1) {
+            jsonContent = jsonContent.substring(arrayStart);
+          } else {
+            throw new Error('Response does not contain a JSON array');
+          }
+        }
+        
+        // Parse the cleaned JSON string
+        console.log('Attempting to parse decisions JSON:', jsonContent);
+        const decisions = JSON.parse(jsonContent) as Partial<Decision>[];
         return Array.isArray(decisions) ? decisions : [];
       } catch (error) {
         console.error('Failed to parse decisions:', error);
+        console.log('Raw response content:', response.content);
         return [];
       }
     } catch (error) {

@@ -31,6 +31,7 @@ export class AIServiceProvider {
    */
   initializeService(id: string, config: AIServiceConfig): AIService | null {
     console.log(`Initializing AI service: ${id}`);
+    console.log(`API key provided: ${config.apiKey ? 'Yes (length: ' + config.apiKey.length + ')' : 'No'}`);
     
     // Skip initialization if no API key is provided
     if (!config.apiKey) {
@@ -41,16 +42,20 @@ export class AIServiceProvider {
     const factory = this.factories.get(id);
     
     if (!factory) {
+      console.error(`No factory registered for service ID: ${id}`);
       throw new Error(`No factory registered for service ID: ${id}`);
     }
     
     try {
+      console.log(`Creating ${id} service with model: ${config.model}`);
       const service = factory.create(config);
       this.services.set(id, service);
+      console.log(`Successfully registered ${id} service`);
       
       // Set as default if it's the first one
       if (this.defaultServiceId === null) {
         this.defaultServiceId = id;
+        console.log(`Set ${id} as default service`);
       }
       
       return service;

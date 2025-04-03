@@ -32,35 +32,59 @@ export const fetchWithTimeout = async (url: string, options: FetchOptions = {}) 
 };
 
 /**
- * Create a fetch function for API calls
- * Attempts to make direct API calls - note that this may encounter CORS issues in the browser
+ * Create a fetch function that uses our Vite proxy to avoid CORS issues
  */
 export const createProxyFetch = (baseUrl: string, apiKey: string, useMock = false) => {
-  console.log(`Creating fetch for ${baseUrl}, direct API call mode`);
-
-  // Return real fetch implementation
+  // Determine which proxy endpoint to use based on the baseUrl
+  const isAnthropicApi = baseUrl.includes('anthropic.com');
+  const isOpenAIApi = baseUrl.includes('openai.com');
+  
+  // Get the proxy prefix
+  let proxyPrefix = '';
+  if (isAnthropicApi) {
+    proxyPrefix = '/api/anthropic';
+    console.log('Using Anthropic proxy endpoint');
+  } else if (isOpenAIApi) {
+    proxyPrefix = '/api/openai';
+    console.log('Using OpenAI proxy endpoint');
+  } else {
+    console.warn(`No proxy defined for ${baseUrl}, may encounter CORS issues`);
+  }
+  
+  // Return a fetch implementation that uses the appropriate proxy
   return async (url: string, options: FetchOptions = {}) => {
-    console.log(`Making API request to: ${url}`);
-    
-    try {
-      // Try with direct fetch
-      return await fetchWithTimeout(url, options);
-    } catch (error) {
-      console.error(`Error making API request to ${url}:`, error);
+    // Only proxy external URLs
+    if (url.startsWith('http')) {
+      // Extract the path from the full URL
+      const urlObj = new URL(url);
+      const path = urlObj.pathname + urlObj.search;
       
-      // Provide helpful error information
-      if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
-        console.error(`
-          CORS Error: Browser security prevented direct API call.
-          
-          To make real API calls, you need to:
-          1. Use a backend proxy service
-          2. Use a CORS proxy (not recommended for production/API keys)
-          3. Create a simple local proxy server
-        `);
+      // Construct the proxied URL
+      const proxiedUrl = proxyPrefix + path;
+      console.log(`Proxying request to: ${proxiedUrl}`);
+      
+      // Make sure to include the API key in the appropriate header
+      const headers: Record<string, string> = { ...(options.headers || {}) };
+      
+      if (isAnthropicApi) {
+        // For Anthropic, the server will add the API key from environment
+        // We still need to include the anthropic-version header
+        headers['anthropic-version'] = '2023-06-01';
+        headers['anthropic-dangerous-direct-browser-access'] = 'true';
+        delete headers['x-api-key']; // Remove it from client-side
+      } else if (isOpenAIApi) {
+        // For OpenAI, we need to include the API key in Authorization header
+        headers['Authorization'] = `Bearer ${apiKey}`;
       }
       
-      throw error;
+      // Return the proxied request
+      return await fetchWithTimeout(proxiedUrl, {
+        ...options,
+        headers
+      });
     }
+    
+    // For non-http URLs (already local), pass through
+    return await fetchWithTimeout(url, options);
   };
 };

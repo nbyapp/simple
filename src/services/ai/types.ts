@@ -93,9 +93,16 @@ export const ANTHROPIC_MODELS: AIModelOption[] = [
     capabilities: ['Text Generation', 'Creative Writing', 'Advanced Reasoning', 'Code Generation']
   },
   {
-    id: 'claude-3-sonnet-20240229',
-    name: 'Claude 3 Sonnet',
-    contextLength: 180000,
+    id: 'claude-3-5-sonnet-20241022',
+    name: 'Claude 3.5 Sonnet',
+    contextLength: 200000,
+    description: 'Latest Claude model with enhanced reasoning and efficiency',
+    capabilities: ['Text Generation', 'Creative Writing', 'Advanced Reasoning', 'Code Generation']
+  },
+  {
+    id: 'claude-3-7-sonnet-20250219',
+    name: 'Claude 3.7 Sonnet',
+    contextLength: 200000,
     description: 'Balanced model offering strong performance and efficiency',
     capabilities: ['Text Generation', 'Creative Writing', 'Reasoning', 'Code Generation']
   },

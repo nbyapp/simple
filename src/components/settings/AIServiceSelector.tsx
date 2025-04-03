@@ -12,10 +12,13 @@ const AIServiceSelector: React.FC = () => {
   
   // Get available AI services
   const availableServices = aiServiceProvider.getAllServices();
+  console.log('Available services in selector:', availableServices.map(s => s.id));
+  console.log('Current selected service:', aiServiceId);
   
   // Handle service change
   const handleServiceChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newServiceId = e.target.value;
+    console.log(`Changing service from ${aiServiceId} to ${newServiceId}`);
     setAIService(newServiceId);
   };
   
