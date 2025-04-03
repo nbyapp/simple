@@ -4,10 +4,48 @@ import OpenAI from 'openai';
 import { createProxyFetch } from './proxy';
 
 /**
+ * Custom implementation for streaming that doesn't rely on OpenAI's SDK
+ * This is needed because the SDK's stream handling doesn't work well with our mock implementation
+ */
+async function* createCustomStream(response: Response): AsyncIterable<any> {
+  if (!response.body) {
+    throw new Error('Response body is null');
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (line.trim() === '' || line.trim() === 'data: [DONE]') continue;
+        try {
+          const data = line.replace(/^data: /, '');
+          yield JSON.parse(data);
+        } catch (e) {
+          console.warn('Error parsing JSON from stream:', e, 'Line:', line);
+        }
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+/**
  * OpenAI service adapter
  */
 export class OpenAIService extends BaseAIService {
   private client: OpenAI;
+  private proxyFetch: typeof fetch;
   
   id = 'openai';
   name = 'OpenAI';
@@ -16,7 +54,7 @@ export class OpenAIService extends BaseAIService {
     super(config);
     
     // Create a fetch function that uses our proxy to avoid CORS issues
-    const proxyFetch = createProxyFetch(
+    this.proxyFetch = createProxyFetch(
       config.baseUrl || 'https://api.openai.com',
       config.apiKey,
       config.useMock || false
@@ -26,7 +64,7 @@ export class OpenAIService extends BaseAIService {
     this.client = new OpenAI({
       apiKey: config.apiKey || 'mock-key',
       baseURL: config.baseUrl || undefined,
-      fetch: proxyFetch as any, // Type assertion needed for compatibility
+      fetch: this.proxyFetch as any, // Type assertion needed for compatibility
     });
   }
   
@@ -61,13 +99,32 @@ export class OpenAIService extends BaseAIService {
   
   protected async makeCompletionRequest(formattedMessages: OpenAI.Chat.ChatCompletionMessageParam[], stream: boolean): Promise<any> {
     try {
-      return this.client.chat.completions.create({
+      // Build the request body
+      const requestBody = {
         model: this.config.model,
         messages: formattedMessages,
         temperature: this.config.temperature || 0.7,
         max_tokens: this.config.maxTokens,
         stream: stream,
-      });
+      };
+      
+      // For streaming, we need to use a custom implementation to avoid SDK issues
+      if (stream) {
+        const response = await this.proxyFetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${this.config.apiKey || 'mock-key'}`,
+          },
+          body: JSON.stringify(requestBody),
+        });
+        
+        // Return a custom stream iterator that doesn't depend on OpenAI's SDK
+        return createCustomStream(response);
+      } else {
+        // For non-streaming, we can use the SDK as normal
+        return this.client.chat.completions.create(requestBody);
+      }
     } catch (error) {
       console.error("Error in OpenAI API call:", error);
       throw error;
@@ -84,9 +141,10 @@ export class OpenAIService extends BaseAIService {
     };
   }
   
-  protected parseStreamChunk(chunk: OpenAI.Chat.ChatCompletionChunk): AIStreamChunk {
-    const content = chunk.choices[0]?.delta?.content || '';
-    const finishReason = chunk.choices[0]?.finish_reason;
+  protected parseStreamChunk(chunk: any): AIStreamChunk {
+    // Handle our custom stream format
+    const content = chunk.choices?.[0]?.delta?.content || '';
+    const finishReason = chunk.choices?.[0]?.finish_reason;
     const done = !!finishReason;
     
     return {
