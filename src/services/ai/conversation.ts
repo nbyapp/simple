@@ -228,8 +228,16 @@ export class ConversationService {
       
       // Parse the JSON response
       try {
-        const suggestions = JSON.parse(response.content) as string[];
-        return Array.isArray(suggestions) ? suggestions : [];
+        // Extract just the JSON array part from the response
+        const jsonMatch = response.content.match(/\[[\s\S]*\]/);
+        if (jsonMatch) {
+          const jsonStr = jsonMatch[0];
+          const suggestions = JSON.parse(jsonStr) as string[];
+          return Array.isArray(suggestions) ? suggestions : [];
+        } else {
+          console.error('Could not find JSON array in suggestions response');
+          return [];
+        }
       } catch (error) {
         console.error('Failed to parse suggestions:', error);
         return [];
@@ -267,42 +275,20 @@ export class ConversationService {
       
       // Parse the JSON response
       try {
-        // First, try to clean the response to handle potential formatting issues
-        let jsonContent = response.content.trim();
+        console.log('Attempting to parse decisions JSON:', response.content);
         
-        // Check if content starts with ``` or ``` (code block markers)
-        const codeBlockStart = jsonContent.indexOf('```');
-        if (codeBlockStart !== -1) {
-          const codeBlockEnd = jsonContent.lastIndexOf('```');
-          // Extract content between code blocks
-          if (codeBlockEnd > codeBlockStart) {
-            jsonContent = jsonContent.substring(codeBlockStart + 3, codeBlockEnd).trim();
-            
-            // Remove language identifier if present (e.g., ```json)
-            const firstLineBreak = jsonContent.indexOf('\n');
-            if (firstLineBreak !== -1 && !jsonContent.substring(0, firstLineBreak).includes('{') && !jsonContent.substring(0, firstLineBreak).includes('[')) {
-              jsonContent = jsonContent.substring(firstLineBreak).trim();
-            }
-          }
+        // Extract just the JSON array part from the response
+        const jsonMatch = response.content.match(/\[[\s\S]*?\]/);
+        if (jsonMatch) {
+          const jsonStr = jsonMatch[0];
+          const decisions = JSON.parse(jsonStr) as Partial<Decision>[];
+          return Array.isArray(decisions) ? decisions : [];
+        } else {
+          console.error('Could not find JSON array in decisions response');
+          return [];
         }
-        
-        // Ensure it's a valid JSON array
-        if (!jsonContent.startsWith('[')) {
-          const arrayStart = jsonContent.indexOf('[');
-          if (arrayStart !== -1) {
-            jsonContent = jsonContent.substring(arrayStart);
-          } else {
-            throw new Error('Response does not contain a JSON array');
-          }
-        }
-        
-        // Parse the cleaned JSON string
-        console.log('Attempting to parse decisions JSON:', jsonContent);
-        const decisions = JSON.parse(jsonContent) as Partial<Decision>[];
-        return Array.isArray(decisions) ? decisions : [];
       } catch (error) {
         console.error('Failed to parse decisions:', error);
-        console.log('Raw response content:', response.content);
         return [];
       }
     } catch (error) {
