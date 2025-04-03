@@ -33,7 +33,7 @@ For each decision or requirement, provide:
 
 A good decision should be specific, actionable, and relevant to the app being created.
 
-Format your response as a JSON array of decisions, like this:
+VERY IMPORTANT: Format your response EXACTLY as a JSON array of decisions, with no additional text before or after the array, like this:
 [
   {
     "title": "Social Media Integration",
@@ -49,6 +49,8 @@ Format your response as a JSON array of decisions, like this:
   }
 ]
 
+If you need to provide explanation or commentary, include it as a comment inside a decision object with a title like "Note" or "Analysis".
+
 Only include decisions that have been explicitly mentioned or can be directly inferred from the conversation.`,
 
   // Prompt for generating suggestions
@@ -62,7 +64,7 @@ Focus on questions or suggestions that would:
 
 Make these suggestions short (15 words or less), natural, and conversational - as if a user might type them.
 
-Format your response as a JSON array of strings, like this:
+VERY IMPORTANT: Format your response EXACTLY as a JSON array of strings, with no additional text before or after the array, like this:
 ["What features are most important?", "Who are your target users?", "Should it work offline?"]
 
 Do not include any explanation or additional text outside the JSON array.`,
