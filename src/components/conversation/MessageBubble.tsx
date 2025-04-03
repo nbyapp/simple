@@ -30,9 +30,9 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
       <MessageContent>
         {isTyping ? (
           <TypingIndicator>
-            <Dot delay={0} />
-            <Dot delay={0.2} />
-            <Dot delay={0.4} />
+            <Dot $delay={0} />
+            <Dot $delay={0.2} />
+            <Dot $delay={0.4} />
           </TypingIndicator>
         ) : (
           content
@@ -130,7 +130,7 @@ const TypingIndicator = styled.div`
 `
 
 interface DotProps {
-  delay: number
+  $delay: number; // Using transient prop with $ prefix to avoid DOM warnings
 }
 
 const Dot = styled.span<DotProps>`
@@ -141,7 +141,7 @@ const Dot = styled.span<DotProps>`
   background-color: ${({ theme }) => theme.colors.text.tertiary};
   border-radius: 50%;
   animation: pulse 1.5s infinite;
-  animation-delay: ${({ delay }) => delay}s;
+  animation-delay: ${({ $delay }) => $delay}s;
   
   @keyframes pulse {
     0%, 100% {
