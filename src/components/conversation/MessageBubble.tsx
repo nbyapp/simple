@@ -30,12 +30,12 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
       <MessageContent>
         {isTyping ? (
           <TypingIndicator>
-            <Dot $delay={0} />
-            <Dot $delay={0.2} />
-            <Dot $delay={0.4} />
+            <Dot delay={0} />
+            <Dot delay={0.2} />
+            <Dot delay={0.4} />
           </TypingIndicator>
         ) : (
-          content
+          <MessageText>{content}</MessageText>
         )}
         {children}
       </MessageContent>
@@ -60,6 +60,7 @@ const MessageContainer = styled(motion.div)<MessageContainerProps>`
   margin-bottom: ${({ theme }) => theme.spacing.md};
   padding: ${({ theme }) => theme.spacing.md};
   border-radius: ${({ theme }) => theme.borderRadius.md};
+  box-shadow: ${({ theme }) => theme.shadows.sm};
   
   ${({ sender, theme }) => {
     if (sender === 'user') {
@@ -96,6 +97,11 @@ const MessageContent = styled.div`
   word-break: break-word;
 `
 
+const MessageText = styled.p`
+  margin: 0;
+  line-height: 1.5;
+`
+
 const MessageMeta = styled.div`
   display: flex;
   justify-content: flex-end;
@@ -130,7 +136,7 @@ const TypingIndicator = styled.div`
 `
 
 interface DotProps {
-  $delay: number; // Using transient prop with $ prefix to avoid DOM warnings
+  delay: number
 }
 
 const Dot = styled.span<DotProps>`
@@ -141,7 +147,7 @@ const Dot = styled.span<DotProps>`
   background-color: ${({ theme }) => theme.colors.text.tertiary};
   border-radius: 50%;
   animation: pulse 1.5s infinite;
-  animation-delay: ${({ $delay }) => $delay}s;
+  animation-delay: ${({ delay }) => delay}s;
   
   @keyframes pulse {
     0%, 100% {
